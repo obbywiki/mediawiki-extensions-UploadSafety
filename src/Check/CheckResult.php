@@ -1,25 +1,31 @@
 <?php
 
-namespace MediaWiki\Extension\NSFWImageModeration;
+namespace MediaWiki\Extension\UploadSafety\Check;
 
-class ClassificationResult {
+class CheckResult {
 
 	/**
-	 * @param bool $rejected
-	 * @param string $message_key
-	 * @param string $label
-	 * @param float|null $score
+	 * @param CheckVerdict $verdict
+	 * @param string $label Top label reported by the check
+	 * @param float|null $score Score of the top label
 	 * @param array<array{label: string, score: float}> $scores
-	 * @param string $detail
+	 * @param string $detail Extra debug detail (threshold, failure reason, ...)
 	 */
 	public function __construct(
-		public readonly bool $rejected,
-		public readonly string $message_key,
+		public readonly CheckVerdict $verdict,
 		public readonly string $label = '',
 		public readonly ?float $score = null,
 		public readonly array $scores = [],
 		public readonly string $detail = '',
 	) {
+	}
+
+	public static function unavailable( string $detail ): self {
+		return new self( CheckVerdict::Unavailable, '', null, [], $detail );
+	}
+
+	public function with_detail( string $detail ): self {
+		return new self( $this->verdict, $this->label, $this->score, $this->scores, $detail );
 	}
 
 	public function debug_summary(): string {
@@ -43,7 +49,7 @@ class ClassificationResult {
 			$parts[] = 'scores=' . implode( ',', $score_parts );
 		}
 
-		return $parts === [] ? 'no-details' : implode( ' ', $parts );
+		return implode( ' ', $parts );
 	}
 
 	private static function format_score( float $score ): string {

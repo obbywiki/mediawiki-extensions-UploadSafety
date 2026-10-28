@@ -1,6 +1,6 @@
 <?php
 
-namespace MediaWiki\Extension\NSFWImageModeration;
+namespace MediaWiki\Extension\UploadSafety;
 
 use MediaWiki\Api\Hook\APIAfterExecuteHook;
 use MediaWiki\Context\RequestContext;
@@ -11,49 +11,29 @@ use MediaWiki\Upload\Hook\UploadVerifyFileHook;
 
 class Hooks implements UploadVerifyFileHook, UploadCompleteHook, BeforePageDisplayHook, APIAfterExecuteHook {
 
-	private const SESSION_KEY = 'nsfwimagemoderation-debug';
+	private const SESSION_KEY = 'uploadsafety-debug';
 
 	public function __construct(
-		private readonly ImageClassifier $image_classifier,
+		private readonly UploadScreener $upload_screener,
 	) {
 	}
 
 	/** @inheritDoc */
 	public function onUploadVerifyFile( $upload, $mime, &$error ) {
 		$mime = (string)$mime;
-		if ( !ImageClassifier::is_classifiable_mime( $mime ) ) {
+		if ( !ImageTypes::is_screenable_mime( $mime ) ) {
 			return;
 		}
 
-		$file_path = $upload->getTempPath();
-		if ( $file_path === '' || !is_readable( $file_path ) ) {
-			$result = $this->image_classifier->result_for_unavailable( 'reason=unreadable-temp-file' );
-			if ( $result->rejected ) {
-				$error = $this->image_classifier->rejection_error(
-					$result->message_key,
-					$result->debug_summary()
-				);
-			}
-
-			return;
-		}
-
-		if ( !ImageClassifier::is_readable_raster_image( $file_path ) ) {
-			return;
-		}
-
-		$result = $this->image_classifier->classify( $file_path, $mime, (string)$upload->getDesiredDestName() );
+		$result = $this->upload_screener->screen( $upload->getTempPath(), $mime, (string)$upload->getDesiredDestName() );
 		if ( $result->rejected ) {
-			$error = $this->image_classifier->rejection_error(
-				$result->message_key,
-				$result->debug_summary()
-			);
+			$error = $this->upload_screener->rejection_error( $result );
 		}
 	}
 
 	/** @inheritDoc */
 	public function onUploadComplete( $uploadBase ) {
-		$summary = $this->image_classifier->last_approved_debug_summary();
+		$summary = $this->upload_screener->last_approved_debug_summary();
 		if ( $summary === null ) {
 			return;
 		}
@@ -73,8 +53,8 @@ class Hooks implements UploadVerifyFileHook, UploadCompleteHook, BeforePageDispl
 
 		$session->remove( self::SESSION_KEY );
 		$out->prependHTML( Html::noticeBox(
-			wfMessage( 'nsfwimagemoderation-debug-approved', $summary )->escaped(),
-			'nsfwimagemoderation-debug'
+			wfMessage( 'uploadsafety-debug-approved', $summary )->escaped(),
+			'uploadsafety-debug'
 		) );
 	}
 
@@ -84,12 +64,12 @@ class Hooks implements UploadVerifyFileHook, UploadCompleteHook, BeforePageDispl
 			return;
 		}
 
-		$summary = $this->image_classifier->last_approved_debug_summary();
+		$summary = $this->upload_screener->last_approved_debug_summary();
 		if ( $summary === null ) {
 			return;
 		}
 
-		$module->getResult()->addValue( null, 'nsfwimagemoderation', [ 'debug' => $summary, 'rejected' => false ] );
+		$module->getResult()->addValue( null, 'uploadsafety', [ 'debug' => $summary, 'rejected' => false ] );
 	}
 
 }

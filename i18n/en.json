@@ -4,10 +4,10 @@
 			"Wolfite"
 		]
 	},
-	"nsfwimagemoderation-desc": "Classifies uploaded images and rejects content that fails moderation.",
-	"nsfwimagemoderation-upload-rejected": "This image was rejected by content moderation.",
-	"nsfwimagemoderation-upload-rejected-debug": "This image was rejected by content moderation. [$1]",
-	"nsfwimagemoderation-upload-unavailable": "This image could not be checked by content moderation and was rejected.",
-	"nsfwimagemoderation-upload-unavailable-debug": "This image could not be checked by content moderation and was rejected. [$1]",
-	"nsfwimagemoderation-debug-approved": "Content moderation debug (approved): $1"
+	"uploadsafety-desc": "Screens uploaded images and rejects content that fails moderation.",
+	"uploadsafety-upload-rejected": "This image was rejected by content moderation.",
+	"uploadsafety-upload-rejected-debug": "This image was rejected by content moderation. [$1]",
+	"uploadsafety-upload-unavailable": "This image could not be checked by content moderation and was rejected.",
+	"uploadsafety-upload-unavailable-debug": "This image could not be checked by content moderation and was rejected. [$1]",
+	"uploadsafety-debug-approved": "Content moderation debug (approved): $1"
 }

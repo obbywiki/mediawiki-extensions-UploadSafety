@@ -1,17 +1,33 @@
 <?php
 
 use MediaWiki\Config\ServiceOptions;
-use MediaWiki\Extension\NSFWImageModeration\ImageClassifier;
+use MediaWiki\Extension\UploadSafety\Check\NsfwClassifierCheck;
+use MediaWiki\Extension\UploadSafety\UploadScreener;
+use MediaWiki\Logger\LoggerFactory;
 use MediaWiki\MediaWikiServices;
 
 return [
-	'NSFWImageModeration.ImageClassifier' => static function ( MediaWikiServices $services ): ImageClassifier {
-		return new ImageClassifier(
+	'UploadSafety.NsfwClassifierCheck' => static function ( MediaWikiServices $services ): NsfwClassifierCheck {
+		return new NsfwClassifierCheck(
 			$services->getHttpRequestFactory(),
 			new ServiceOptions(
-				ImageClassifier::CONSTRUCTOR_OPTIONS,
+				NsfwClassifierCheck::CONSTRUCTOR_OPTIONS,
 				$services->getMainConfig()
-			)
+			),
+			LoggerFactory::getInstance( 'UploadSafety' )
+		);
+	},
+
+	'UploadSafety.UploadScreener' => static function ( MediaWikiServices $services ): UploadScreener {
+		return new UploadScreener(
+			new ServiceOptions(
+				UploadScreener::CONSTRUCTOR_OPTIONS,
+				$services->getMainConfig()
+			),
+			[
+				$services->get( 'UploadSafety.NsfwClassifierCheck' ),
+			],
+			LoggerFactory::getInstance( 'UploadSafety' )
 		);
 	},
 ];

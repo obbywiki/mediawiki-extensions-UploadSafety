@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Starts an mwenv test wiki for this worktree with UploadSafety loaded.
+# No classifier sidecar is started, so uploads fail closed unless $wgUploadSafetyFailClosed is false.
+# Safe to run again. Extra arguments go to `mwenv start`, e.g. `scripts/mwenv-setup --db sqlite`.
+set -euo pipefail
+
+mwenv start --mw "${MW:-1.46}" --php "${PHP:-8.3}" "$@"
+echo "Test wiki ready. Run: mwenv run -- composer phpunit"

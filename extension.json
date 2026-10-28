@@ -1,82 +1,74 @@
 {
 	"manifest_version": 2,
-	"name": "NSFWImageModeration",
-	"descriptionmsg": "nsfwimagemoderation-desc",
+	"name": "UploadSafety",
+	"version": "0.1.0",
 	"author": [
 		"[https://wolfite.dev Wolfite]",
 		"[https://obby.wiki The Obby Wiki]"
 	],
-	"version": "0.1.0",
+	"url": "https://github.com/obbywiki/mediawiki-extensions-UploadSafety",
+	"descriptionmsg": "uploadsafety-desc",
 	"license-name": "GPL-3.0-or-later",
-	"url": "https://github.com/obbywiki/mediawiki-extensions-NSFWImageModeration",
-
 	"type": "other",
-
 	"requires": {
 		"MediaWiki": ">= 1.46.0",
 		"platform": {
 			"php": ">= 8.3"
 		}
 	},
-
 	"AutoloadNamespaces": {
-		"MediaWiki\\Extension\\NSFWImageModeration\\": "src/"
+		"MediaWiki\\Extension\\UploadSafety\\": "src/"
 	},
-
+	"ServiceWiringFiles": [
+		"src/ServiceWiring.php"
+	],
 	"MessagesDirs": {
-		"NSFWImageModeration": [
+		"UploadSafety": [
 			"i18n"
 		]
 	},
-
 	"HookHandlers": {
 		"main": {
-			"class": "MediaWiki\\Extension\\NSFWImageModeration\\Hooks",
+			"class": "MediaWiki\\Extension\\UploadSafety\\Hooks",
 			"services": [
-				"NSFWImageModeration.ImageClassifier"
+				"UploadSafety.UploadScreener"
 			]
 		}
 	},
-
 	"Hooks": {
 		"UploadVerifyFile": "main",
 		"UploadComplete": "main",
 		"BeforePageDisplay": "main",
 		"APIAfterExecute": "main"
 	},
-
-	"ServiceWiringFiles": [
-		"src/ServiceWiring.php"
-	],
-
 	"config": {
-		"NSFWImageModerationClassifierUrl": {
+		"UploadSafetyAlwaysReject": {
+			"value": false,
+			"description": "When true, reject every image upload without running any checks."
+		},
+		"UploadSafetyFailClosed": {
+			"value": true,
+			"description": "When true, reject image uploads if a check is unavailable (service unreachable or invalid response). When false, allow those uploads (fail open)."
+		},
+		"UploadSafetyDebug": {
+			"value": false,
+			"description": "When true, upload success and rejection UI (and the UploadSafety log group) include check scores and failure details."
+		},
+		"UploadSafetyTimeout": {
+			"value": 30,
+			"description": "HTTP timeout in seconds for check services."
+		},
+		"UploadSafetyNsfwClassifierUrl": {
 			"value": "http://nsfw_detector:8000/v1/classify",
 			"description": "Hugging Face image-classification endpoint (POST JSON {inputs: base64, parameters: {top_k: 2}})."
 		},
-		"NSFWImageModerationAlwaysReject": {
-			"value": false,
-			"description": "When true, reject every image upload without calling the classifier."
+		"UploadSafetyNsfwClassifierApiKey": {
+			"value": "",
+			"description": "Optional Bearer token sent as Authorization to the NSFW classifier. Leave empty for a local nsfw_detector with no auth."
 		},
-		"NSFWImageModerationTimeout": {
-			"value": 30,
-			"description": "Classifier HTTP timeout in seconds."
-		},
-		"NSFWImageModerationNsfwThreshold": {
+		"UploadSafetyNsfwThreshold": {
 			"value": 0.5,
 			"description": "Reject the upload when the Falconsai `nsfw` score is greater than or equal to this value."
-		},
-		"NSFWImageModerationApiKey": {
-			"value": "",
-			"description": "Optional Bearer token sent as Authorization. Leave empty for a local nsfw_detector with no auth."
-		},
-		"NSFWImageModerationDebug": {
-			"value": false,
-			"description": "When true, upload success and rejection UI (and the NSFWImageModeration log group) include classifier scores and failure details."
-		},
-		"NSFWImageModerationFailClosed": {
-			"value": true,
-			"description": "When true, reject image uploads if the classifier is unreachable or returns an invalid response. When false, allow those uploads (fail open)."
 		}
 	}
 }

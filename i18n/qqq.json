@@ -4,10 +4,10 @@
 			"Wolfite"
 		]
 	},
-	"nsfwimagemoderation-desc": "{{desc|name=NSFWImageModeration|url=https://github.com/obbywiki/mediawiki-extensions-NSFWImageModeration}}",
-	"nsfwimagemoderation-upload-rejected": "Error shown when an image upload is blocked by the moderation classifier.",
-	"nsfwimagemoderation-upload-rejected-debug": "Debug error shown when an image upload is blocked. $1 is classifier detail (label, scores, threshold).",
-	"nsfwimagemoderation-upload-unavailable": "Error shown when the moderation classifier cannot be reached and the upload is rejected.",
-	"nsfwimagemoderation-upload-unavailable-debug": "Debug error shown when classification fails. $1 is the failure reason.",
-	"nsfwimagemoderation-debug-approved": "Notice shown on the next page after a successful image upload when debug mode is enabled. $1 is classifier detail (label, scores, threshold)."
+	"uploadsafety-desc": "{{desc|name=UploadSafety|url=https://github.com/obbywiki/mediawiki-extensions-UploadSafety}}",
+	"uploadsafety-upload-rejected": "Error shown when an image upload is blocked by a moderation check.",
+	"uploadsafety-upload-rejected-debug": "Debug error shown when an image upload is blocked. $1 is screening detail (checks, labels, scores, threshold).",
+	"uploadsafety-upload-unavailable": "Error shown when a moderation check cannot be reached and the upload is rejected.",
+	"uploadsafety-upload-unavailable-debug": "Debug error shown when a moderation check fails. $1 is the failure reason.",
+	"uploadsafety-debug-approved": "Notice shown on the next page after a successful image upload when debug mode is enabled. $1 is screening detail (checks, labels, scores, threshold)."
 }

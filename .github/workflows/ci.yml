@@ -5,21 +5,66 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  lint:
-    uses: StarCitizenTools/mediawiki-ci-workflows/.github/workflows/lint.yml@main
+  lint-php:
+    uses: StarCitizenTools/mediawiki-ci-workflows/.github/workflows/lint.yml@b6de99f7945b70dcbb2203eeabe6bca3f88ddd17
     with:
       lint-php: true
-      # lint-js: true
-      # lint-styles: true
-      # lint-i18n: true
-      # lint-md: true
 
-  # test-js:
-  #   uses: StarCitizenTools/mediawiki-ci-workflows/.github/workflows/test-js.yml@main
-
-  # test-php:
-  #   uses: StarCitizenTools/mediawiki-ci-workflows/.github/workflows/test-php.yml@main
-  #   with:
-  #     project-type: extension
-  #     project-name: IntegratedProfiles
+  test-php:
+    name: MW ${{ matrix.mw }}, PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mw: REL1_46
+            php: '8.3'
+            experimental: false
+          - mw: REL1_46
+            php: '8.5'
+            experimental: false
+          - mw: master
+            php: '8.5'
+            experimental: true
+    defaults:
+      run:
+        working-directory: mediawiki
+    steps:
+      - uses: shivammathur/setup-php@3bdfe21000ea9539e3a94c4f692f984b24fa97e0
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, intl, pdo_sqlite, exif
+          coverage: none
+          tools: composer
+      - name: Check out MediaWiki
+        uses: actions/checkout@v7
+        with:
+          repository: wikimedia/mediawiki
+          ref: ${{ matrix.mw }}
+          path: mediawiki
+      - name: Check out UploadSafety
+        uses: actions/checkout@v7
+        with:
+          path: mediawiki/extensions/UploadSafety
+      - name: Install MediaWiki dependencies
+        run: composer install --no-interaction --no-progress
+      - name: Install test wiki
+        run: >-
+          php maintenance/run.php install
+          --dbtype sqlite --dbname mw --dbpath "$PWD"
+          --server http://localhost --scriptpath ''
+          --pass AdminPassword WikiName AdminUser
+      - name: Load UploadSafety
+        run: echo "wfLoadExtension( 'UploadSafety' );" >> LocalSettings.php
+      - name: Run PHPUnit
+        run: composer phpunit -- extensions/UploadSafety/tests/phpunit

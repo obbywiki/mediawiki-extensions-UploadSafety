@@ -1,6 +1,6 @@
 <?php
 
-namespace MediaWiki\Extension\NSFWImageModeration;
+namespace MediaWiki\Extension\UploadSafety\Check;
 
 /**
  * Hugging Face image-classification task payload and response. HANDLING IS SUBJECT TO CHANGE.
@@ -26,9 +26,9 @@ class HfImageClassification {
 
 	/**
 	 * @param mixed $data Decoded JSON from the classifier
-	 * @return ?ClassificationResult Null when the payload is not a valid HF classification output
+	 * @return ?CheckResult Null when the payload is not a valid HF classification output
 	 */
-	public static function from_response( mixed $data, float $threshold ): ?ClassificationResult {
+	public static function from_response( mixed $data, float $threshold ): ?CheckResult {
 		$scores = self::parse_scores( $data );
 		if ( $scores === null ) {
 			return null;
@@ -58,9 +58,8 @@ class HfImageClassification {
 			return null;
 		}
 
-		return new ClassificationResult(
-			$rejected,
-			$rejected ? 'nsfwimagemoderation-upload-rejected' : '',
+		return new CheckResult(
+			$rejected ? CheckVerdict::Reject : CheckVerdict::Pass,
 			$top_label,
 			is_finite( $top_score ) ? $top_score : null,
 			$scores
