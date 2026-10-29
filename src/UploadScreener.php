@@ -21,6 +21,7 @@ class UploadScreener {
 		'UploadSafetyDebug',
 		'UploadSafetyFailClosed',
 		'UploadSafetyChecks',
+		'UploadSafetyAutoScreen',
 	];
 
 	public const MSG_REJECTED = 'uploadsafety-upload-rejected';
@@ -89,6 +90,17 @@ class UploadScreener {
 		}
 
 		return [ $result->message_key ];
+	}
+
+	/**
+	 * Whether uploads from $surface are screened automatically ($wgUploadSafetyAutoScreen).
+	 * Surfaces without an entry are screened, so new ones are covered by default.
+	 * Callers that screen on their own terms (e.g. a moderation queue) call screen() directly instead.
+	 */
+	public function auto_screens( string $surface ): bool {
+		$config = $this->options->get( 'UploadSafetyAutoScreen' );
+
+		return !is_array( $config ) || ( $config[$surface] ?? true ) !== false;
 	}
 
 	/**

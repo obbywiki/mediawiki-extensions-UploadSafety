@@ -35,6 +35,12 @@
 				"UploadSafety.SidecarInfo",
 				"MainConfig"
 			]
+		},
+		"integratedprofiles": {
+			"class": "MediaWiki\\Extension\\UploadSafety\\IntegratedProfilesHooks",
+			"services": [
+				"UploadSafety.UploadScreener"
+			]
 		}
 	},
 	"Hooks": {
@@ -42,7 +48,8 @@
 		"UploadComplete": "main",
 		"BeforePageDisplay": "main",
 		"APIAfterExecute": "main",
-		"SoftwareInfo": "main"
+		"SoftwareInfo": "main",
+		"IntegratedProfilesVerifyImageUpload": "integratedprofiles"
 	},
 	"config": {
 		"UploadSafetySidecarUrl": {
@@ -52,6 +59,14 @@
 		"UploadSafetySidecarApiKey": {
 			"value": "",
 			"description": "Optional Bearer token sent as Authorization to the sidecar. Leave empty for a local sidecar with no auth."
+		},
+		"UploadSafetyAutoScreen": {
+			"value": {
+				"upload": true,
+				"avatar": true,
+				"banner": true
+			},
+			"description": "Surfaces screened automatically: upload (core file uploads), avatar and banner (IntegratedProfiles). Set one to false to stop screening it automatically, e.g. when another extension calls the UploadSafety.UploadScreener service itself. Surfaces not listed are screened."
 		},
 		"UploadSafetyChecks": {
 			"value": {
@@ -84,7 +99,7 @@
 		},
 		"UploadSafetyShowSidecarVersion": {
 			"value": true,
-			"description": "When true, Special:Version lists the sidecar's service and runtime versions from /v1/info (never its models)."
+			"description": "When true, Special:Version lists the sidecar and runtime versions from /v1/info (never its service or model names)."
 		}
 	}
 }

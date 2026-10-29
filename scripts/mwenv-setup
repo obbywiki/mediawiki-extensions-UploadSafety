@@ -1,8 +1,25 @@
 #!/usr/bin/env bash
-# Starts an mwenv test wiki for this worktree with UploadSafety loaded.
+# Starts an mwenv test wiki for this worktree with UploadSafety and its soft dependency IntegratedProfiles.
 # No classifier sidecar is started, so uploads fail closed unless $wgUploadSafetyFailClosed is false.
 # Safe to run again. Extra arguments go to `mwenv start`, e.g. `scripts/mwenv-setup --db sqlite`.
 set -euo pipefail
 
+# IntegratedProfilesVerifyImageUpload is not in a release yet, so pin a main commit
+INTEGRATEDPROFILES_REF=940ade6d9e6186f6a267c537c6407f8c7b142a99
+
 mwenv start --mw "${MW:-1.46}" --php "${PHP:-8.3}" "$@"
+
+mwenv run -- sh -s "$INTEGRATEDPROFILES_REF" <<'SH'
+set -eu
+cd ../..
+if [ ! -d extensions/IntegratedProfiles ]; then
+	git init --quiet extensions/IntegratedProfiles
+	git -C extensions/IntegratedProfiles fetch --quiet --depth 1 \
+		https://github.com/obbywiki/mediawiki-extensions-IntegratedProfiles "$1"
+	git -C extensions/IntegratedProfiles -c advice.detachedHead=false checkout --quiet FETCH_HEAD
+fi
+
+grep -q "'IntegratedProfiles'" LocalSettings.php || echo "wfLoadExtension( 'IntegratedProfiles' );" >> LocalSettings.php
+php maintenance/run.php update --quick >/dev/null
 echo "Test wiki ready. Run: mwenv run -- composer phpunit"
+SH

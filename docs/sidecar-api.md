@@ -109,11 +109,11 @@ Any non-`200` response means the whole request failed, and every requested check
 
 ## `GET /v1/info`
 
-Describes the sidecar. UploadSafety caches it briefly and shows `service` and `runtime` on Special:Version. Model names stay off that page, since they make crafting adversarial images easier.
+Describes the sidecar. UploadSafety caches it briefly and shows the service version (labelled "UploadSafety sidecar", not `service.name`) and `runtime` on Special:Version. Service and model names stay off that page: model names make crafting adversarial images easier, and either can reveal what the wiki screens for.
 
 ```json
 {
-  "service": { "name": "nsfw-detector", "version": "0.2.0", "url": "https://github.com/obbywiki/mediawiki-extensions-UploadSafety" },
+  "service": { "name": "upload-safety-sidecar", "version": "0.2.0", "url": "https://github.com/obbywiki/mediawiki-extensions-UploadSafety" },
   "runtime": [
     { "name": "Python", "version": "3.12.7", "url": "https://www.python.org/" },
     { "name": "PyTorch", "version": "2.5.1", "url": "https://pytorch.org/" }

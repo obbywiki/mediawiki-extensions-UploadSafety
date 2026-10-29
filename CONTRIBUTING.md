@@ -24,7 +24,7 @@ As for everything else, see: <https://github.com/obbywiki/standards>
 - `src/Sidecar/` is the HTTP client for that contract (`SidecarClient`), its response model, and the cached `/v1/info` used on Special:Version.
 - `src/UploadScreener.php` sends an upload to the sidecar once for every check in `$wgUploadSafetyChecks`, then decides the outcome (fail open/closed, always-reject, debug detail).
 - `src/Check/` turns signals into verdicts. Each check has a `CheckEvaluator` (e.g. `NsfwEvaluator`) that returns a `CheckResult` with a `CheckVerdict` (`Pass`, `Reject` or `Unavailable`). Register new evaluators in `src/ServiceWiring.php`.
-- `src/Hooks.php` wires the screener into core's upload hooks.
+- `src/Hooks.php` wires the screener into core's upload hooks, and `src/IntegratedProfilesHooks.php` into IntegratedProfiles avatar and banner uploads. The latter is a separate handler so the IntegratedProfiles interface is only loaded when that extension runs the hook.
 
 Adding a check means defining its signal in `docs/sidecar-api.md`, implementing it in the sidecar, then adding an evaluator here.
 
@@ -44,7 +44,7 @@ mwenv run -- composer phpunit
 mwenv run -- composer phpunit -- --filter test_some_name
 ```
 
-`scripts/mwenv-setup` defaults to MediaWiki 1.46, PHP 8.3, and MariaDB. CI uses SQLite and tests MediaWiki 1.46 with PHP 8.3 and 8.5. To match it, run `scripts/mwenv-setup --db sqlite` (or `PHP=8.5 scripts/mwenv-setup --db sqlite`) in a fresh worktree or after `mwenv destroy`.
+`scripts/mwenv-setup` defaults to MediaWiki 1.46, PHP 8.3, and MariaDB, and also installs IntegratedProfiles (pinned to a `main` commit, same as CI) so its hook tests run instead of being skipped. CI uses SQLite and tests MediaWiki 1.46 with PHP 8.3 and 8.5. To match it, run `scripts/mwenv-setup --db sqlite` (or `PHP=8.5 scripts/mwenv-setup --db sqlite`) in a fresh worktree or after `mwenv destroy`.
 
 No classifier sidecar is started, so uploads in the test wiki fail closed unless `$wgUploadSafetyFailClosed` is `false`.
 

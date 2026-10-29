@@ -56,6 +56,13 @@ jobs:
         uses: actions/checkout@v7
         with:
           path: mediawiki/extensions/UploadSafety
+      - name: Check out IntegratedProfiles
+        uses: actions/checkout@v7
+        with:
+          repository: obbywiki/mediawiki-extensions-IntegratedProfiles
+          # IntegratedProfilesVerifyImageUpload is not in a release yet (keep in sync with scripts/mwenv-setup)
+          ref: 940ade6d9e6186f6a267c537c6407f8c7b142a99
+          path: mediawiki/extensions/IntegratedProfiles
       - name: Install MediaWiki dependencies
         run: composer install --no-interaction --no-progress
       - name: Install test wiki
@@ -64,7 +71,10 @@ jobs:
           --dbtype sqlite --dbname mw --dbpath "$PWD"
           --server http://localhost --scriptpath ''
           --pass AdminPassword WikiName AdminUser
-      - name: Load UploadSafety
-        run: echo "wfLoadExtension( 'UploadSafety' );" >> LocalSettings.php
+      - name: Load UploadSafety and IntegratedProfiles
+        run: |
+          echo "wfLoadExtension( 'UploadSafety' );" >> LocalSettings.php
+          echo "wfLoadExtension( 'IntegratedProfiles' );" >> LocalSettings.php
+          php maintenance/run.php update --quick
       - name: Run PHPUnit
         run: composer phpunit -- extensions/UploadSafety/tests/phpunit

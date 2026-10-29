@@ -6,7 +6,7 @@ use Wikimedia\ObjectCache\BagOStuff;
 
 /**
  * Cached `GET /v1/info`, used for Special:Version.
- * Only `service` and `runtime` are exposed; model names stay private since they help with crafting adversarial images.
+ * Only the service version and `runtime` are exposed; service and model names stay private, model names since they help with crafting adversarial images.
  */
 class SidecarInfo {
 
@@ -55,10 +55,8 @@ class SidecarInfo {
 				continue;
 			}
 
-			$name = self::wikitext_safe( $entry['name'] );
-			if ( $index === 0 ) {
-				$name = 'UploadSafety sidecar (' . $name . ')';
-			}
+			// the service's own name is not shown, so a sidecar named after its checks cannot leak them onto the page
+			$name = $index === 0 ? 'UploadSafety sidecar' : self::wikitext_safe( $entry['name'] );
 			$url = $entry['url'] ?? null;
 			$label = is_string( $url ) && preg_match( '#^https?://[^\s\[\]]+$#', $url ) ? '[' . $url . ' ' . $name . ']' : $name;
 

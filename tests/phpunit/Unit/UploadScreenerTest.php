@@ -59,6 +59,7 @@ class UploadScreenerTest extends MediaWikiUnitTestCase {
 			'UploadSafetyDebug' => false,
 			'UploadSafetyFailClosed' => true,
 			'UploadSafetyChecks' => [ 'nsfw' => [ 'threshold' => 0.5 ] ],
+			'UploadSafetyAutoScreen' => [ 'upload' => true, 'avatar' => true, 'banner' => true ],
 		] ) );
 
 		return new UploadScreener( $options, $sidecar, [ new NsfwEvaluator() ], new NullLogger() );
@@ -221,6 +222,14 @@ class UploadScreenerTest extends MediaWikiUnitTestCase {
 
 		$screener->screen( $this->png_path, 'image/svg+xml' );
 		$this->assertNull( $screener->last_approved_debug_summary(), 'skipped uploads have no summary' );
+	}
+
+	public function test_auto_screens(): void {
+		$screener = $this->new_screener( null, [ 'UploadSafetyAutoScreen' => [ 'upload' => true, 'avatar' => false ] ] );
+
+		$this->assertTrue( $screener->auto_screens( 'upload' ) );
+		$this->assertFalse( $screener->auto_screens( 'avatar' ) );
+		$this->assertTrue( $screener->auto_screens( 'banner' ), 'unlisted surfaces are screened' );
 	}
 
 }

@@ -28,7 +28,7 @@ class SidecarInfoTest extends MediaWikiUnitTestCase {
 
 		$info = new SidecarInfo( $client, new HashBagOStuff() );
 		$expected = [
-			'[https://example.org/sidecar UploadSafety sidecar (nsfw-detector)]' => '0.2.0',
+			'[https://example.org/sidecar UploadSafety sidecar]' => '0.2.0',
 			'[https://www.python.org/ Python]' => '3.12.7',
 			'Bad' => '1script',
 		];
@@ -36,6 +36,7 @@ class SidecarInfoTest extends MediaWikiUnitTestCase {
 		$this->assertSame( $expected, $info->software_entries() );
 		$this->assertSame( $expected, $info->software_entries(), 'cached' );
 		$this->assertStringNotContainsString( 'secret-model', json_encode( $expected ) );
+		$this->assertStringNotContainsString( 'nsfw', json_encode( $expected ) );
 	}
 
 	public function test_unreachable_sidecar_has_no_entries(): void {

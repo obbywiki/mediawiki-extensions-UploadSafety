@@ -26,7 +26,7 @@ class Hooks implements UploadVerifyFileHook, UploadCompleteHook, BeforePageDispl
 	/** @inheritDoc */
 	public function onUploadVerifyFile( $upload, $mime, &$error ) {
 		$mime = (string)$mime;
-		if ( !ImageTypes::is_screenable_mime( $mime ) ) {
+		if ( !$this->upload_screener->auto_screens( 'upload' ) || !ImageTypes::is_screenable_mime( $mime ) ) {
 			return;
 		}
 
