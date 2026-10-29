@@ -8,6 +8,7 @@ namespace MediaWiki\Extension\UploadSafety;
 class ImageTypes {
 
 	private const SCREENABLE_MIME_TYPES = [
+		'image/avif',
 		'image/bmp',
 		'image/gif',
 		'image/jpeg',
@@ -23,6 +24,7 @@ class ImageTypes {
 	];
 
 	private const SCREENABLE_IMAGE_TYPES = [
+		IMAGETYPE_AVIF,
 		IMAGETYPE_BMP,
 		IMAGETYPE_GIF,
 		IMAGETYPE_JPEG,

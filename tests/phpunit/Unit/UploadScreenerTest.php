@@ -188,6 +188,14 @@ class UploadScreenerTest extends MediaWikiUnitTestCase {
 		$this->assertTrue( $result->skipped() );
 	}
 
+	public function test_avif_is_screened(): void {
+		// 8x8 AVIF written by Pillow
+		file_put_contents( $this->png_path, base64_decode( 'AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAADrbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAAAAAAAOcGl0bQAAAAAAAQAAAB5pbG9jAAAAAEQAAAEAAQAAAAEAAAETAAAAJwAAAChpaW5mAAAAAAABAAAAGmluZmUCAAAAAAEAAGF2MDFDb2xvcgAAAABqaXBycAAAAEtpcGNvAAAAFGlzcGUAAAAAAAAACAAAAAgAAAAQcGl4aQAAAAADCAgIAAAADGF2MUOBAAwAAAAAE2NvbHJuY2x4AAEADQAGgAAAABdpcG1hAAAAAAAAAAEAAQQBAoMEAAAAL21kYXQSAAoIGAi/aICGg0IyGRlHh4Yhh5555oAAAJBAyRxhSgnBjgTNEYw=' ) );
+		$result = $this->new_screener( self::response( [ 'nsfw' => self::nsfw( 0.9 ) ] ) )->screen( $this->png_path, 'image/avif' );
+
+		$this->assertTrue( $result->rejected );
+	}
+
 	public function test_non_screenable_mime_is_skipped(): void {
 		$result = $this->new_screener( null )->screen( $this->png_path, 'image/svg+xml' );
 

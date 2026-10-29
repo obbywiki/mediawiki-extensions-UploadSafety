@@ -28,11 +28,13 @@
 		]
 	},
 	"AvailableRights": [
-		"uploadsafety-log"
+		"uploadsafety-log",
+		"uploadsafety-upload-svg"
 	],
 	"GroupPermissions": {
 		"sysop": {
-			"uploadsafety-log": true
+			"uploadsafety-log": true,
+			"uploadsafety-upload-svg": true
 		}
 	},
 	"LogTypes": [
@@ -74,6 +76,12 @@
 				"MainConfig"
 			]
 		},
+		"svg": {
+			"class": "MediaWiki\\Extension\\UploadSafety\\SvgUploadHooks",
+			"services": [
+				"MimeAnalyzer"
+			]
+		},
 		"integratedprofiles": {
 			"class": "MediaWiki\\Extension\\UploadSafety\\IntegratedProfilesHooks",
 			"services": [
@@ -84,6 +92,7 @@
 	},
 	"Hooks": {
 		"UploadVerifyFile": "main",
+		"UploadVerifyUpload": "svg",
 		"UploadComplete": "main",
 		"BeforePageDisplay": "main",
 		"APIAfterExecute": "main",

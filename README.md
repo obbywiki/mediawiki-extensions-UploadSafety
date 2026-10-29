@@ -17,11 +17,23 @@ UploadSafety screens automatically by default:
 * **Core uploads** (Special:Upload, the upload API, UploadWizard and anything else going through `UploadVerifyFile`).
 * **IntegratedProfiles avatars and banners**, through its `IntegratedProfilesVerifyImageUpload` hook (unreleased, needs IntegratedProfiles from `main`). Nothing extra to install; the handler is ignored when IntegratedProfiles is not loaded.
 
+SVG files are not screened, and MediaWiki lets them embed raster images, so any image could be wrapped in one to skip screening, effectively bypassing the entire point of this extension. Uploading SVGs therefore needs the `uploadsafety-upload-svg` right (sysops by default). Everyone else gets an error asking for a PNG, JPEG or WebP instead. SVGs already on the wiki are not affected. If regular users of your wiki heavily utilize SVGs, please open an issue on GitHub.
+
 Other extensions (e.g. a moderation queue) can screen on their own terms through the `UploadSafety.UploadScreener` service, and turn off automatic screening for a surface with `$wgUploadSafetyAutoScreen`.
 
 Ensure `$wgUploadSafetyDebug` is disabled in production as it provides exact classification values that may help with circumvention or bypassing.
 
 `$wgUploadSafetyFailClosed` defaults to `true` (reject when a check is down or returns a bad response). Set it to `false` to fail open.
+
+### Formats
+
+| Format | Handling |
+| --- | --- |
+| PNG, JPEG, GIF, WebP, AVIF, BMP, TIFF | Screened. Animated and multi-page images have their frames sampled (which can be expensive if done frequently). |
+| SVG | Intentionally not screened. Instead, uploadsare gated behind the `uploadsafety-upload-svg` right (see above). |
+| Anything else (HEIC, JPEG XL, PDF, DjVu, video, ...) | Not screened. |
+
+Formats not listed as screened pass through untouched, so before adding one to `$wgFileExtensions`, make sure it's screened or restricted. AVIF is screened when uploaded as its own file. MediaWiki also allows AVIF (and other raster images) embedded inside SVGs, which the SVG restriction covers. Video is deliberately left to manual moderation: it is rare on these wikis and expensive to screen.
 
 ## Rate limits and the rejection log
 

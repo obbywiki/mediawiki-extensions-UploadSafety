@@ -10,17 +10,16 @@ use MediaWiki\User\User;
 use Wikimedia\ObjectCache\WANObjectCache;
 
 /**
- * Automatic screening (core uploads, IntegratedProfiles images): UploadScreener plus the side effects
- * a wiki wants when it screens on its own, i.e. rate limits, a verdict cache and the rejection log.
- * Other callers (e.g. a moderation queue) can use UploadScreener directly and decide those for themselves.
+ * Automatic screening (core uploads, IntegratedProfiles images): UploadScreener plus the side effects a wiki wants when it screens on its own, i.e. rate limits, a verdict cache and the rejection log.
+ * Other callers (e.g. a moderation queue) can use UploadScreener directly and decide those for themselves instead.
  */
 class AutoScreening {
 
-	/** Every image sent to the sidecar, so a single account cannot tie it up */
+	// every image sent to the sidecar (so a single account cannot tie it up)
 	public const LIMIT_SCREEN = 'uploadsafety-screen';
-	/** Rejections over a short window, generous enough for one page's worth of false positives */
+	// rejections over a short window, generous enough for one page's worth of false positives
 	public const LIMIT_REJECT = 'uploadsafety-reject';
-	/** Rejections over a day, to slow down probing for the threshold */
+	// rejections over a day, to slow down probing for the threshold
 	public const LIMIT_REJECT_DAILY = 'uploadsafety-reject-daily';
 
 	public const MSG_SCREEN_LIMITED = 'uploadsafety-upload-screen-limited';
