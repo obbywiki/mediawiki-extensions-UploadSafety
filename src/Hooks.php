@@ -9,6 +9,7 @@ use MediaWiki\Extension\UploadSafety\Sidecar\SidecarInfo;
 use MediaWiki\Hook\BeforePageDisplayHook;
 use MediaWiki\Html\Html;
 use MediaWiki\Specials\Hook\SoftwareInfoHook;
+use MediaWiki\Title\Title;
 use MediaWiki\Upload\Hook\UploadCompleteHook;
 use MediaWiki\Upload\Hook\UploadVerifyFileHook;
 
@@ -18,6 +19,7 @@ class Hooks implements UploadVerifyFileHook, UploadCompleteHook, BeforePageDispl
 
 	public function __construct(
 		private readonly UploadScreener $upload_screener,
+		private readonly AutoScreening $auto_screening,
 		private readonly SidecarInfo $sidecar_info,
 		private readonly Config $config,
 	) {
@@ -30,7 +32,16 @@ class Hooks implements UploadVerifyFileHook, UploadCompleteHook, BeforePageDispl
 			return;
 		}
 
-		$result = $this->upload_screener->screen( $upload->getTempPath(), $mime, (string)$upload->getDesiredDestName() );
+		$filename = (string)$upload->getDesiredDestName();
+		$target = $filename !== '' ? Title::makeTitleSafe( NS_FILE, $filename ) : null;
+		$result = $this->auto_screening->screen(
+			null,
+			$upload->getTempPath(),
+			$mime,
+			$filename,
+			'upload',
+			$target
+		);
 		if ( $result->rejected ) {
 			$error = $this->upload_screener->rejection_error( $result );
 		}
@@ -38,7 +49,7 @@ class Hooks implements UploadVerifyFileHook, UploadCompleteHook, BeforePageDispl
 
 	/** @inheritDoc */
 	public function onUploadComplete( $uploadBase ) {
-		$summary = $this->upload_screener->last_approved_debug_summary();
+		$summary = $this->auto_screening->last_approved_debug_summary();
 		if ( $summary === null ) {
 			return;
 		}
@@ -69,7 +80,7 @@ class Hooks implements UploadVerifyFileHook, UploadCompleteHook, BeforePageDispl
 			return;
 		}
 
-		$summary = $this->upload_screener->last_approved_debug_summary();
+		$summary = $this->auto_screening->last_approved_debug_summary();
 		if ( $summary === null ) {
 			return;
 		}

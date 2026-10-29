@@ -24,7 +24,8 @@ As for everything else, see: <https://github.com/obbywiki/standards>
 - `src/Sidecar/` is the HTTP client for that contract (`SidecarClient`), its response model, and the cached `/v1/info` used on Special:Version.
 - `src/UploadScreener.php` sends an upload to the sidecar once for every check in `$wgUploadSafetyChecks`, then decides the outcome (fail open/closed, always-reject, debug detail).
 - `src/Check/` turns signals into verdicts. Each check has a `CheckEvaluator` (e.g. `NsfwEvaluator`) that returns a `CheckResult` with a `CheckVerdict` (`Pass`, `Reject` or `Unavailable`). Register new evaluators in `src/ServiceWiring.php`.
-- `src/Hooks.php` wires the screener into core's upload hooks, and `src/IntegratedProfilesHooks.php` into IntegratedProfiles avatar and banner uploads. The latter is a separate handler so the IntegratedProfiles interface is only loaded when that extension runs the hook.
+- `src/AutoScreening.php` is automatic screening: rate limits, the verdict cache and `src/RejectionLog.php` around the screener. The screener itself stays free of side effects so other callers (e.g. a moderation queue) can use it on their own terms.
+- `src/Hooks.php` wires automatic screening into core's upload hooks, and `src/IntegratedProfilesHooks.php` into IntegratedProfiles avatar and banner uploads. The latter is a separate handler so the IntegratedProfiles interface is only loaded when that extension runs the hook.
 
 Adding a check means defining its signal in `docs/sidecar-api.md`, implementing it in the sidecar, then adding an evaluator here.
 

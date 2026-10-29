@@ -1,7 +1,9 @@
 <?php
 
 use MediaWiki\Config\ServiceOptions;
+use MediaWiki\Extension\UploadSafety\AutoScreening;
 use MediaWiki\Extension\UploadSafety\Check\NsfwEvaluator;
+use MediaWiki\Extension\UploadSafety\RejectionLog;
 use MediaWiki\Extension\UploadSafety\Sidecar\SidecarClient;
 use MediaWiki\Extension\UploadSafety\Sidecar\SidecarInfo;
 use MediaWiki\Extension\UploadSafety\UploadScreener;
@@ -38,6 +40,19 @@ return [
 				new NsfwEvaluator(),
 			],
 			LoggerFactory::getInstance( 'UploadSafety' )
+		);
+	},
+
+	'UploadSafety.RejectionLog' => static function (): RejectionLog {
+		return new RejectionLog();
+	},
+
+	'UploadSafety.AutoScreening' => static function ( MediaWikiServices $services ): AutoScreening {
+		return new AutoScreening(
+			$services->get( 'UploadSafety.UploadScreener' ),
+			$services->getRateLimiter(),
+			$services->getMainWANObjectCache(),
+			$services->get( 'UploadSafety.RejectionLog' )
 		);
 	},
 ];

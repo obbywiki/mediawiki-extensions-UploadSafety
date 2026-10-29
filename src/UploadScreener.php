@@ -22,6 +22,7 @@ class UploadScreener {
 		'UploadSafetyFailClosed',
 		'UploadSafetyChecks',
 		'UploadSafetyAutoScreen',
+		'UploadSafetyMaxFrames',
 	];
 
 	public const MSG_REJECTED = 'uploadsafety-upload-rejected';
@@ -29,8 +30,6 @@ class UploadScreener {
 
 	/** @var array<string, CheckEvaluator> */
 	private readonly array $evaluators;
-
-	private ?ScreeningResult $last_result = null;
 
 	/**
 	 * @param ServiceOptions $options
@@ -71,17 +70,6 @@ class UploadScreener {
 	}
 
 	/**
-	 * Screening detail for an allowed image in the current request, or null when debug is off.
-	 */
-	public function last_approved_debug_summary(): ?string {
-		if ( !$this->debug_enabled() || $this->last_result === null || $this->last_result->rejected || $this->last_result->skipped() ) {
-			return null;
-		}
-
-		return 'rejected=0 ' . $this->last_result->debug_summary();
-	}
-
-	/**
 	 * @return array{0: string}|array{0: string, 1: string}
 	 */
 	public function rejection_error( ScreeningResult $result ): array {
@@ -90,6 +78,10 @@ class UploadScreener {
 		}
 
 		return [ $result->message_key ];
+	}
+
+	public function max_frames(): int {
+		return max( 1, (int)$this->options->get( 'UploadSafetyMaxFrames' ) );
 	}
 
 	/**
@@ -232,9 +224,10 @@ class UploadScreener {
 		);
 	}
 
-	private function log_result( ScreeningResult $result, string $file_path, string $mime, string $filename, string $surface ): void {
-		$this->last_result = $result;
-
+	/**
+	 * Debug log line for a screening, also used for results that did not come from screen() (e.g. cached verdicts).
+	 */
+	public function log_result( ScreeningResult $result, string $file_path, string $mime, string $filename, string $surface ): void {
 		if ( !$this->debug_enabled() ) {
 			return;
 		}

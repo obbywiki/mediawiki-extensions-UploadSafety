@@ -3,6 +3,7 @@
 namespace MediaWiki\Extension\UploadSafety;
 
 use MediaWiki\Extension\IntegratedProfiles\Hook\IntegratedProfilesVerifyImageUploadHook;
+use MediaWiki\Page\PageReferenceValue;
 use MediaWiki\User\UserIdentity;
 
 /**
@@ -13,6 +14,7 @@ class IntegratedProfilesHooks implements IntegratedProfilesVerifyImageUploadHook
 
 	public function __construct(
 		private readonly UploadScreener $upload_screener,
+		private readonly AutoScreening $auto_screening,
 	) {
 	}
 
@@ -23,7 +25,8 @@ class IntegratedProfilesHooks implements IntegratedProfilesVerifyImageUploadHook
 		}
 
 		$filename = $kind . ':' . $central_id . ( $user !== null ? ':' . $user->getName() : '' );
-		$result = $this->upload_screener->screen( $path, $mime, $filename, $kind );
+		$target = $user !== null ? PageReferenceValue::localReference( NS_USER, strtr( $user->getName(), ' ', '_' ) ) : null;
+		$result = $this->auto_screening->screen( null, $path, $mime, $filename, $kind, $target );
 		if ( $result->rejected ) {
 			$error = $this->upload_screener->rejection_error( $result );
 

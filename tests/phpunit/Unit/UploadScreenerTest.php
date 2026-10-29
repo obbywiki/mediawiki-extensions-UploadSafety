@@ -60,6 +60,7 @@ class UploadScreenerTest extends MediaWikiUnitTestCase {
 			'UploadSafetyFailClosed' => true,
 			'UploadSafetyChecks' => [ 'nsfw' => [ 'threshold' => 0.5 ] ],
 			'UploadSafetyAutoScreen' => [ 'upload' => true, 'avatar' => true, 'banner' => true ],
+			'UploadSafetyMaxFrames' => 64,
 		] ) );
 
 		return new UploadScreener( $options, $sidecar, [ new NsfwEvaluator() ], new NullLogger() );
@@ -207,21 +208,6 @@ class UploadScreenerTest extends MediaWikiUnitTestCase {
 		$error = $screener->rejection_error( $screener->screen( $this->png_path, 'image/png' ) );
 		$this->assertSame( UploadScreener::MSG_REJECTED . '-debug', $error[0] );
 		$this->assertStringContainsString( 'check=nsfw verdict=reject threshold=0.5 frame=0', $error[1] );
-	}
-
-	public function test_last_approved_debug_summary(): void {
-		$response = self::response( [ 'nsfw' => self::nsfw( 0.1 ) ] );
-
-		$screener = $this->new_screener( $response );
-		$screener->screen( $this->png_path, 'image/png' );
-		$this->assertNull( $screener->last_approved_debug_summary(), 'debug off' );
-
-		$screener = $this->new_screener( $response, [ 'UploadSafetyDebug' => true ] );
-		$screener->screen( $this->png_path, 'image/png' );
-		$this->assertStringStartsWith( 'rejected=0 frames=1/1/1 check=nsfw verdict=pass', (string)$screener->last_approved_debug_summary() );
-
-		$screener->screen( $this->png_path, 'image/svg+xml' );
-		$this->assertNull( $screener->last_approved_debug_summary(), 'skipped uploads have no summary' );
 	}
 
 	public function test_auto_screens(): void {

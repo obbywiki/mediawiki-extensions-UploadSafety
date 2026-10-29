@@ -9,5 +9,15 @@
 	"uploadsafety-upload-rejected-debug": "Debug error shown when an image upload is blocked. $1 is screening detail (checks, labels, scores, threshold).",
 	"uploadsafety-upload-unavailable": "Error shown when a moderation check cannot be reached and the upload is rejected.",
 	"uploadsafety-upload-unavailable-debug": "Debug error shown when a moderation check fails. $1 is the failure reason.",
-	"uploadsafety-debug-approved": "Notice shown on the next page after a successful image upload when debug mode is enabled. $1 is screening detail (checks, labels, scores, threshold)."
+	"uploadsafety-debug-approved": "Notice shown on the next page after a successful image upload when debug mode is enabled. $1 is screening detail (checks, labels, scores, threshold).",
+	"uploadsafety-upload-screen-limited": "Error shown when a user has sent too many images to screening in a short time (an abuse limit, not related to content).",
+	"uploadsafety-upload-screen-limited-debug": "Debug version of {{msg-mw|uploadsafety-upload-screen-limited}}. $1 is screening detail.",
+	"uploadsafety-upload-reject-limited": "Error shown when a user had too many images rejected recently and uploads are refused until the limit resets.",
+	"uploadsafety-upload-reject-limited-debug": "Debug version of {{msg-mw|uploadsafety-upload-reject-limited}}. $1 is screening detail.",
+	"log-name-uploadsafety": "{{doc-logpage}}\nName of the upload safety log.",
+	"log-description-uploadsafety": "Description of the upload safety log, shown at the top of Special:Log/uploadsafety.",
+	"logentry-uploadsafety-reject": "{{Logentry}}\nParameters:\n* $4 - surface (upload, avatar, banner)\n* $5 - name of the check that rejected the image (e.g. nsfw)\n* $6 - score reported by that check\n* $7 - SHA-1 of the rejected file",
+	"logentry-uploadsafety-limited": "{{Logentry}}\nParameters:\n* $4 - surface of the upload that reached the limit\n* $5 - name of the rate limit (uploadsafety-reject or uploadsafety-reject-daily)",
+	"right-uploadsafety-log": "{{doc-right|uploadsafety-log}}",
+	"action-uploadsafety-log": "{{doc-action|uploadsafety-log}}"
 }

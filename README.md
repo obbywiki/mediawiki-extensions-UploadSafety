@@ -23,6 +23,27 @@ Ensure `$wgUploadSafetyDebug` is disabled in production as it provides exact cla
 
 `$wgUploadSafetyFailClosed` defaults to `true` (reject when a check is down or returns a bad response). Set it to `false` to fail open.
 
+## Rate limits and the rejection log
+
+Automatic screening adds a few things on top of the checks:
+
+* **Rejection log.** Every rejected upload is recorded in Special:Log/uploadsafety with the uploader, target, surface, the check that rejected it, its score, and the file's SHA-1. Rejected images themselves are never kept. The log needs the `uploadsafety-log` right (sysops by default); grant it to your own moderation groups with `$wgGroupPermissions`.
+* **Rejection limits.** Only rejections count, so normal bursts of clean uploads are unaffected. Once reached, image uploads are refused without screening until the limit resets, and one `limited` entry is logged.
+* **Screening limit.** A generous cap on images sent to the sidecar, so one account cannot tie it up.
+* **Verdict cache.** Each verdict is cached for a day by SHA-1 and checks configuration. Re-uploading the same file is answered from the cache, logged as a repeat, and not counted again. Changing `$wgUploadSafetyChecks` or `$wgUploadSafetyMaxFrames` starts a fresh cache.
+
+Defaults (`$wgRateLimits`, `[ count, seconds ]`):
+
+| Action | `newbie` | `user` |
+| --- | --- | --- |
+| `uploadsafety-reject` | `[ 6, 900 ]` | `[ 12, 900 ]` |
+| `uploadsafety-reject-daily` | `[ 15, 86400 ]` | `[ 30, 86400 ]` |
+| `uploadsafety-screen` | `[ 100, 3600 ]` | `[ 100, 3600 ]` |
+
+Users with `noratelimit` (sysops, bots) are exempt. There are deliberately no `ip`, `subnet` or `anon` limits: MediaWiki applies `ip` and `subnet` to newbies by address, so a school sharing one IP would share a limit, and `anon` is a single limit shared by all anonymous users. If your wiki allows anonymous uploads, add `ip` limits yourself.
+
+Calling the `UploadSafety.UploadScreener` service directly (e.g. from a moderation queue) skips all of the above; use `UploadSafety.RejectionLog` if you want the same log.
+
 ## Configuration
 
 | Setting | Default | Description |

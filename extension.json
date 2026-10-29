@@ -27,11 +27,49 @@
 			"i18n"
 		]
 	},
+	"AvailableRights": [
+		"uploadsafety-log"
+	],
+	"GroupPermissions": {
+		"sysop": {
+			"uploadsafety-log": true
+		}
+	},
+	"LogTypes": [
+		"uploadsafety"
+	],
+	"LogRestrictions": {
+		"uploadsafety": "uploadsafety-log"
+	},
+	"LogNames": {
+		"uploadsafety": "log-name-uploadsafety"
+	},
+	"LogHeaders": {
+		"uploadsafety": "log-description-uploadsafety"
+	},
+	"LogActionsHandlers": {
+		"uploadsafety/*": "MediaWiki\\Logging\\LogFormatter"
+	},
+	"RateLimits": {
+		"uploadsafety-screen": {
+			"newbie": [ 100, 3600 ],
+			"user": [ 100, 3600 ]
+		},
+		"uploadsafety-reject": {
+			"newbie": [ 6, 900 ],
+			"user": [ 12, 900 ]
+		},
+		"uploadsafety-reject-daily": {
+			"newbie": [ 15, 86400 ],
+			"user": [ 30, 86400 ]
+		}
+	},
 	"HookHandlers": {
 		"main": {
 			"class": "MediaWiki\\Extension\\UploadSafety\\Hooks",
 			"services": [
 				"UploadSafety.UploadScreener",
+				"UploadSafety.AutoScreening",
 				"UploadSafety.SidecarInfo",
 				"MainConfig"
 			]
@@ -39,7 +77,8 @@
 		"integratedprofiles": {
 			"class": "MediaWiki\\Extension\\UploadSafety\\IntegratedProfilesHooks",
 			"services": [
-				"UploadSafety.UploadScreener"
+				"UploadSafety.UploadScreener",
+				"UploadSafety.AutoScreening"
 			]
 		}
 	},
