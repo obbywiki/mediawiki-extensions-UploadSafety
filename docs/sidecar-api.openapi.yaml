@@ -1,0 +1,241 @@
+openapi: 3.1.0
+info:
+  title: UploadSafety sidecar API
+  version: 1.0.0
+  description: >-
+    Contract between the UploadSafety MediaWiki extension and the service that runs its checks.
+    See sidecar-api.md.
+    Clients must ignore unknown fields.
+  license:
+    name: GPL-3.0-or-later
+security:
+  - {}
+  - bearer: []
+paths:
+  /v1/check:
+    post:
+      summary: Screen one image
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [ image, request ]
+              properties:
+                image:
+                  type: string
+                  contentMediaType: application/octet-stream
+                request:
+                  $ref: '#/components/schemas/CheckRequest'
+            encoding:
+              request:
+                contentType: application/json
+      responses:
+        '200':
+          description: Signals for every requested check
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '413':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/info:
+    get:
+      summary: Describe the sidecar
+      responses:
+        '200':
+          description: Service, runtime, supported checks and limits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Info'
+  /health:
+    get:
+      summary: Liveness
+      security: []
+      responses:
+        '200':
+          description: Models loaded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ status ]
+                properties:
+                  status:
+                    const: ok
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+  responses:
+    Error:
+      description: The request failed, every requested check is unavailable
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ error ]
+            properties:
+              error:
+                $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      required: [ code, message ]
+      properties:
+        code:
+          type: string
+          examples: [ invalid_request, unauthorized, image_too_large, undecodable_image, too_many_pixels, too_many_frames, internal ]
+        message:
+          type: string
+    CheckRequest:
+      type: object
+      required: [ checks ]
+      properties:
+        checks:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            examples: [ nsfw ]
+        mime:
+          type: string
+        surface:
+          type: string
+          examples: [ upload, avatar, banner ]
+        max_frames:
+          type: integer
+          minimum: 1
+    CheckResponse:
+      type: object
+      required: [ image, checks ]
+      properties:
+        image:
+          $ref: '#/components/schemas/ImageInfo'
+        checks:
+          type: object
+          description: Exactly one entry per requested check name
+          additionalProperties:
+            $ref: '#/components/schemas/CheckSignal'
+    ImageInfo:
+      type: object
+      required: [ format, width, height, frames ]
+      properties:
+        format:
+          type: string
+          examples: [ png, jpeg, gif, webp ]
+        width:
+          type: integer
+        height:
+          type: integer
+        frames:
+          type: object
+          required: [ total, distinct, analyzed ]
+          properties:
+            total:
+              type: integer
+              minimum: 1
+            distinct:
+              type: integer
+              minimum: 1
+            analyzed:
+              type: integer
+              minimum: 1
+    CheckSignal:
+      type: object
+      required: [ status ]
+      properties:
+        status:
+          enum: [ ok, unsupported, error ]
+        error:
+          $ref: '#/components/schemas/Error'
+      oneOf:
+        - properties:
+            status:
+              const: ok
+        - properties:
+            status:
+              const: unsupported
+        - required: [ error ]
+          properties:
+            status:
+              const: error
+      description: When status is ok, the remaining fields follow the check's signal schema (e.g. NsfwSignal).
+    NsfwSignal:
+      type: object
+      required: [ status, score, frame ]
+      properties:
+        status:
+          const: ok
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+        frame:
+          type: integer
+          minimum: 0
+        model:
+          type: string
+        labels:
+          type: array
+          items:
+            type: object
+            required: [ label, score ]
+            properties:
+              label:
+                type: string
+              score:
+                type: number
+    Info:
+      type: object
+      required: [ service, checks ]
+      properties:
+        service:
+          $ref: '#/components/schemas/Software'
+        runtime:
+          type: array
+          items:
+            $ref: '#/components/schemas/Software'
+        checks:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              model:
+                type: string
+              revision:
+                type: string
+        limits:
+          type: object
+          properties:
+            max_bytes:
+              type: integer
+            max_frames:
+              type: integer
+            max_decode_frames:
+              type: integer
+            max_pixels:
+              type: integer
+    Software:
+      type: object
+      required: [ name, version ]
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        url:
+          type: string
+          format: uri

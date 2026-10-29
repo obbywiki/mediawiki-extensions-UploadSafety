@@ -31,7 +31,9 @@
 		"main": {
 			"class": "MediaWiki\\Extension\\UploadSafety\\Hooks",
 			"services": [
-				"UploadSafety.UploadScreener"
+				"UploadSafety.UploadScreener",
+				"UploadSafety.SidecarInfo",
+				"MainConfig"
 			]
 		}
 	},
@@ -39,36 +41,50 @@
 		"UploadVerifyFile": "main",
 		"UploadComplete": "main",
 		"BeforePageDisplay": "main",
-		"APIAfterExecute": "main"
+		"APIAfterExecute": "main",
+		"SoftwareInfo": "main"
 	},
 	"config": {
-		"UploadSafetyAlwaysReject": {
-			"value": false,
-			"description": "When true, reject every image upload without running any checks."
+		"UploadSafetySidecarUrl": {
+			"value": "http://nsfw_detector:8000",
+			"description": "Base URL of the sidecar implementing the UploadSafety sidecar API (docs/sidecar-api.md), without a trailing path."
+		},
+		"UploadSafetySidecarApiKey": {
+			"value": "",
+			"description": "Optional Bearer token sent as Authorization to the sidecar. Leave empty for a local sidecar with no auth."
+		},
+		"UploadSafetyChecks": {
+			"value": {
+				"nsfw": {
+					"threshold": 0.5
+				}
+			},
+			"merge_strategy": "provide_default",
+			"description": "Checks to run, as name => parameters. Setting this replaces the default entirely. nsfw: reject when the score is >= threshold."
+		},
+		"UploadSafetyMaxFrames": {
+			"value": 64,
+			"description": "Maximum frames of an animated image the sidecar should analyse (distinct frames are sampled evenly beyond this). The sidecar may clamp it."
+		},
+		"UploadSafetyTimeout": {
+			"value": 30,
+			"description": "Sidecar HTTP timeout in seconds."
 		},
 		"UploadSafetyFailClosed": {
 			"value": true,
-			"description": "When true, reject image uploads if a check is unavailable (service unreachable or invalid response). When false, allow those uploads (fail open)."
+			"description": "When true, reject image uploads if the sidecar or any configured check is unavailable (unreachable, error, unsupported or invalid response). When false, allow those uploads (fail open)."
+		},
+		"UploadSafetyAlwaysReject": {
+			"value": false,
+			"description": "When true, reject every image upload without running any checks."
 		},
 		"UploadSafetyDebug": {
 			"value": false,
 			"description": "When true, upload success and rejection UI (and the UploadSafety log group) include check scores and failure details."
 		},
-		"UploadSafetyTimeout": {
-			"value": 30,
-			"description": "HTTP timeout in seconds for check services."
-		},
-		"UploadSafetyNsfwClassifierUrl": {
-			"value": "http://nsfw_detector:8000/v1/classify",
-			"description": "Hugging Face image-classification endpoint (POST JSON {inputs: base64, parameters: {top_k: 2}})."
-		},
-		"UploadSafetyNsfwClassifierApiKey": {
-			"value": "",
-			"description": "Optional Bearer token sent as Authorization to the NSFW classifier. Leave empty for a local nsfw_detector with no auth."
-		},
-		"UploadSafetyNsfwThreshold": {
-			"value": 0.5,
-			"description": "Reject the upload when the Falconsai `nsfw` score is greater than or equal to this value."
+		"UploadSafetyShowSidecarVersion": {
+			"value": true,
+			"description": "When true, Special:Version lists the sidecar's service and runtime versions from /v1/info (never its models)."
 		}
 	}
 }

@@ -5,9 +5,10 @@ namespace MediaWiki\Extension\UploadSafety\Tests\Unit;
 
 use MediaWiki\Config\HashConfig;
 use MediaWiki\Config\ServiceOptions;
-use MediaWiki\Extension\UploadSafety\Check\CheckResult;
-use MediaWiki\Extension\UploadSafety\Check\CheckVerdict;
-use MediaWiki\Extension\UploadSafety\Check\ImageCheck;
+use MediaWiki\Extension\UploadSafety\Check\NsfwEvaluator;
+use MediaWiki\Extension\UploadSafety\Sidecar\SidecarClient;
+use MediaWiki\Extension\UploadSafety\Sidecar\SidecarResponse;
+use MediaWiki\Extension\UploadSafety\Sidecar\SidecarUnavailableException;
 use MediaWiki\Extension\UploadSafety\UploadScreener;
 use MediaWikiUnitTestCase;
 use Psr\Log\NullLogger;
@@ -21,6 +22,8 @@ use Psr\Log\NullLogger;
 class UploadScreenerTest extends MediaWikiUnitTestCase {
 
 	private const PNG_1X1 = "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89" . "\x00\x00\x00\rIDATx\xdac\xfc\xcf\xc0P\x0f\x00\x04\x85\x01\x80\x84\xa9\x8c!\x00\x00\x00\x00IEND\xaeB`\x82";
+
+	private const IMAGE = [ 'format' => 'png', 'width' => 1, 'height' => 1, 'frames' => [ 'total' => 1, 'distinct' => 1, 'analyzed' => 1 ] ];
 
 	private string $png_path;
 
@@ -38,149 +41,183 @@ class UploadScreenerTest extends MediaWikiUnitTestCase {
 	}
 
 	/**
-	 * @param list<ImageCheck> $checks
+	 * @param SidecarResponse|SidecarUnavailableException|null $response Null when the sidecar must not be called
 	 * @param array<string, mixed> $config
 	 */
-	private function new_screener( array $checks, array $config = [] ): UploadScreener {
+	private function new_screener( SidecarResponse|SidecarUnavailableException|null $response, array $config = [] ): UploadScreener {
+		$sidecar = $this->createMock( SidecarClient::class );
+		if ( $response === null ) {
+			$sidecar->expects( $this->never() )->method( 'check' );
+		} elseif ( $response instanceof SidecarUnavailableException ) {
+			$sidecar->method( 'check' )->willThrowException( $response );
+		} else {
+			$sidecar->method( 'check' )->willReturn( $response );
+		}
+
 		$options = new ServiceOptions( UploadScreener::CONSTRUCTOR_OPTIONS, new HashConfig( $config + [
 			'UploadSafetyAlwaysReject' => false,
 			'UploadSafetyDebug' => false,
 			'UploadSafetyFailClosed' => true,
+			'UploadSafetyChecks' => [ 'nsfw' => [ 'threshold' => 0.5 ] ],
 		] ) );
 
-		return new UploadScreener( $options, $checks, new NullLogger() );
+		return new UploadScreener( $options, $sidecar, [ new NsfwEvaluator() ], new NullLogger() );
 	}
 
-	private function check( string $name, CheckVerdict $verdict, ?callable $on_run = null ): ImageCheck {
-		return new class( $name, $verdict, $on_run ) implements ImageCheck {
-
-			public function __construct(
-				private readonly string $name,
-				private readonly CheckVerdict $verdict,
-				private readonly mixed $on_run,
-			) {
-			}
-
-			public function name(): string {
-				return $this->name;
-			}
-
-			public function check( string $file_path, string $mime ): CheckResult {
-				if ( $this->on_run !== null ) {
-					( $this->on_run )();
-				}
-
-				return new CheckResult( $this->verdict, 'label', 0.5, [], 'from=' . $this->name );
-			}
-
-		};
+	/**
+	 * @param array<string, mixed> $checks
+	 */
+	private static function response( array $checks ): SidecarResponse {
+		return new SidecarResponse( $checks, self::IMAGE );
 	}
 
-	public function test_all_passing_checks_allow(): void {
-		$result = $this->new_screener( [
-			$this->check( 'a', CheckVerdict::Pass ),
-			$this->check( 'b', CheckVerdict::Pass ),
-		] )->screen( $this->png_path, 'image/png' );
+	private static function nsfw( float $score ): array {
+		return [ 'status' => 'ok', 'score' => $score, 'frame' => 0 ];
+	}
+
+	public function test_passing_signal_allows(): void {
+		$result = $this->new_screener( self::response( [ 'nsfw' => self::nsfw( 0.1 ) ] ) )
+			->screen( $this->png_path, 'image/png' );
 
 		$this->assertFalse( $result->rejected );
-		$this->assertSame( [ 'a', 'b' ], array_keys( $result->checks ) );
+		$this->assertSame( [ 'nsfw' ], array_keys( $result->checks ) );
+		$this->assertStringContainsString( 'frames=1/1/1', $result->debug_summary() );
 	}
 
-	public function test_rejecting_check_rejects_and_stops(): void {
-		$ran_after = false;
-		$result = $this->new_screener( [
-			$this->check( 'a', CheckVerdict::Reject ),
-			$this->check( 'b', CheckVerdict::Pass, static function () use ( &$ran_after ) {
-				$ran_after = true;
-			} ),
-		] )->screen( $this->png_path, 'image/png' );
-
-		$this->assertTrue( $result->rejected );
-		$this->assertSame( UploadScreener::MSG_REJECTED, $result->message_key );
-		$this->assertFalse( $ran_after );
-	}
-
-	public function test_unavailable_check_rejects_when_fail_closed(): void {
-		$result = $this->new_screener( [ $this->check( 'a', CheckVerdict::Unavailable ) ] )
+	public function test_signal_over_threshold_rejects(): void {
+		$result = $this->new_screener( self::response( [ 'nsfw' => self::nsfw( 0.9 ) ] ) )
 			->screen( $this->png_path, 'image/png' );
 
 		$this->assertTrue( $result->rejected );
-		$this->assertSame( UploadScreener::MSG_UNAVAILABLE, $result->message_key );
-		$this->assertStringStartsWith( 'fail=closed', $result->debug_summary() );
+		$this->assertSame( UploadScreener::MSG_REJECTED, $result->message_key );
 	}
 
-	public function test_unavailable_check_continues_when_fail_open(): void {
+	public function test_reject_wins_over_unavailable(): void {
 		$result = $this->new_screener(
-			[ $this->check( 'a', CheckVerdict::Unavailable ), $this->check( 'b', CheckVerdict::Reject ) ],
-			[ 'UploadSafetyFailClosed' => false ]
+			self::response( [ 'nsfw' => self::nsfw( 0.9 ), 'ocr' => [ 'status' => 'unsupported' ] ] ),
+			[ 'UploadSafetyChecks' => [ 'ocr' => [], 'nsfw' => [] ] ]
 		)->screen( $this->png_path, 'image/png' );
 
 		$this->assertTrue( $result->rejected );
 		$this->assertSame( UploadScreener::MSG_REJECTED, $result->message_key );
 	}
 
-	public function test_always_reject_skips_checks(): void {
-		$ran = false;
+	public static function provide_unavailable_signals(): iterable {
+		yield 'missing from response' => [ [], 'reason=missing-from-response' ];
+		yield 'unsupported' => [ [ 'nsfw' => [ 'status' => 'unsupported' ] ], 'reason=unsupported-by-sidecar' ];
+		yield 'check error' => [
+			[ 'nsfw' => [ 'status' => 'error', 'error' => [ 'code' => 'inference_failed', 'message' => 'x' ] ] ],
+			'reason=check-error code=inference_failed',
+		];
+		yield 'unknown status' => [ [ 'nsfw' => [ 'status' => 'maybe' ] ], 'reason=invalid-status' ];
+		yield 'malformed signal' => [ [ 'nsfw' => [ 'status' => 'ok', 'score' => 'high' ] ], 'reason=invalid-signal' ];
+	}
+
+	/**
+	 * @dataProvider provide_unavailable_signals
+	 */
+	public function test_unavailable_signal_follows_fail_policy( array $checks, string $reason ): void {
+		$closed = $this->new_screener( self::response( $checks ) )->screen( $this->png_path, 'image/png' );
+		$this->assertTrue( $closed->rejected );
+		$this->assertSame( UploadScreener::MSG_UNAVAILABLE, $closed->message_key );
+		$this->assertStringContainsString( $reason, $closed->debug_summary() );
+
+		$open = $this->new_screener( self::response( $checks ), [ 'UploadSafetyFailClosed' => false ] )
+			->screen( $this->png_path, 'image/png' );
+		$this->assertFalse( $open->rejected );
+		$this->assertStringStartsWith( 'fail=open', $open->debug_summary() );
+	}
+
+	public function test_check_without_evaluator_is_unavailable(): void {
 		$result = $this->new_screener(
-			[ $this->check( 'a', CheckVerdict::Pass, static function () use ( &$ran ) {
-				$ran = true;
-			} ) ],
-			[ 'UploadSafetyAlwaysReject' => true ]
+			self::response( [ 'typo' => [ 'status' => 'ok' ] ] ),
+			[ 'UploadSafetyChecks' => [ 'typo' => [] ] ]
 		)->screen( $this->png_path, 'image/png' );
 
 		$this->assertTrue( $result->rejected );
-		$this->assertFalse( $ran );
+		$this->assertStringContainsString( 'reason=unknown-check', $result->debug_summary() );
+	}
+
+	public function test_sidecar_failure_follows_fail_policy(): void {
+		$error = new SidecarUnavailableException( 'reason=http-error status=503' );
+
+		$closed = $this->new_screener( $error )->screen( $this->png_path, 'image/png' );
+		$this->assertTrue( $closed->rejected );
+		$this->assertSame( 'fail=closed reason=http-error status=503', $closed->debug_summary() );
+
+		$this->assertFalse(
+			$this->new_screener( $error, [ 'UploadSafetyFailClosed' => false ] )->screen( $this->png_path, 'image/png' )->rejected
+		);
+	}
+
+	public function test_always_reject_skips_sidecar(): void {
+		$result = $this->new_screener( null, [ 'UploadSafetyAlwaysReject' => true ] )->screen( $this->png_path, 'image/png' );
+
+		$this->assertTrue( $result->rejected );
+	}
+
+	public function test_no_checks_skips_sidecar(): void {
+		$result = $this->new_screener( null, [ 'UploadSafetyChecks' => [] ] )->screen( $this->png_path, 'image/png' );
+
+		$this->assertFalse( $result->rejected );
+		$this->assertTrue( $result->skipped() );
+	}
+
+	public function test_enabled_checks_accepts_shorthand_and_disabled_entries(): void {
+		$screener = $this->new_screener( null, [ 'UploadSafetyChecks' => [ 'nsfw', 'ocr' => false, 'qr' => [ 'x' => 1 ] ] ] );
+
+		$this->assertSame( [ 'nsfw' => [], 'qr' => [ 'x' => 1 ] ], $screener->enabled_checks() );
 	}
 
 	public function test_unreadable_file_follows_fail_policy(): void {
 		$path = $this->png_path . '-missing';
 
-		$this->assertTrue( $this->new_screener( [] )->screen( $path, 'image/png' )->rejected );
+		$this->assertTrue( $this->new_screener( null )->screen( $path, 'image/png' )->rejected );
 		$this->assertFalse(
-			$this->new_screener( [], [ 'UploadSafetyFailClosed' => false ] )->screen( $path, 'image/png' )->rejected
+			$this->new_screener( null, [ 'UploadSafetyFailClosed' => false ] )->screen( $path, 'image/png' )->rejected
 		);
 	}
 
 	public function test_non_raster_content_is_skipped(): void {
 		file_put_contents( $this->png_path, '<svg xmlns="http://www.w3.org/2000/svg"/>' );
-		$result = $this->new_screener( [ $this->check( 'a', CheckVerdict::Reject ) ] )
-			->screen( $this->png_path, 'image/png' );
+		$result = $this->new_screener( null )->screen( $this->png_path, 'image/png' );
 
 		$this->assertFalse( $result->rejected );
 		$this->assertTrue( $result->skipped() );
 	}
 
 	public function test_non_screenable_mime_is_skipped(): void {
-		$result = $this->new_screener( [ $this->check( 'a', CheckVerdict::Reject ) ] )
-			->screen( $this->png_path, 'image/svg+xml' );
+		$result = $this->new_screener( null )->screen( $this->png_path, 'image/svg+xml' );
 
 		$this->assertFalse( $result->rejected );
 		$this->assertTrue( $result->skipped() );
 	}
 
 	public function test_rejection_error_hides_detail_unless_debug(): void {
-		$checks = [ $this->check( 'a', CheckVerdict::Reject ) ];
+		$response = self::response( [ 'nsfw' => self::nsfw( 0.9 ) ] );
 
-		$screener = $this->new_screener( $checks );
+		$screener = $this->new_screener( $response );
 		$this->assertSame(
 			[ UploadScreener::MSG_REJECTED ],
 			$screener->rejection_error( $screener->screen( $this->png_path, 'image/png' ) )
 		);
 
-		$screener = $this->new_screener( $checks, [ 'UploadSafetyDebug' => true ] );
+		$screener = $this->new_screener( $response, [ 'UploadSafetyDebug' => true ] );
 		$error = $screener->rejection_error( $screener->screen( $this->png_path, 'image/png' ) );
 		$this->assertSame( UploadScreener::MSG_REJECTED . '-debug', $error[0] );
-		$this->assertStringContainsString( 'check=a verdict=reject from=a', $error[1] );
+		$this->assertStringContainsString( 'check=nsfw verdict=reject threshold=0.5 frame=0', $error[1] );
 	}
 
 	public function test_last_approved_debug_summary(): void {
-		$screener = $this->new_screener( [ $this->check( 'a', CheckVerdict::Pass ) ] );
+		$response = self::response( [ 'nsfw' => self::nsfw( 0.1 ) ] );
+
+		$screener = $this->new_screener( $response );
 		$screener->screen( $this->png_path, 'image/png' );
 		$this->assertNull( $screener->last_approved_debug_summary(), 'debug off' );
 
-		$screener = $this->new_screener( [ $this->check( 'a', CheckVerdict::Pass ) ], [ 'UploadSafetyDebug' => true ] );
+		$screener = $this->new_screener( $response, [ 'UploadSafetyDebug' => true ] );
 		$screener->screen( $this->png_path, 'image/png' );
-		$this->assertStringStartsWith( 'rejected=0 check=a verdict=pass', (string)$screener->last_approved_debug_summary() );
+		$this->assertStringStartsWith( 'rejected=0 frames=1/1/1 check=nsfw verdict=pass', (string)$screener->last_approved_debug_summary() );
 
 		$screener->screen( $this->png_path, 'image/svg+xml' );
 		$this->assertNull( $screener->last_approved_debug_summary(), 'skipped uploads have no summary' );

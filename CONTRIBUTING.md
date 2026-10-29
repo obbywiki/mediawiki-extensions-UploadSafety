@@ -20,9 +20,13 @@ As for everything else, see: <https://github.com/obbywiki/standards>
 
 # Layout
 
-- `src/UploadScreener.php` runs every configured check against an upload and decides the outcome (fail open/closed, always-reject, debug detail).
-- `src/Check/` holds the checks. Each implements `ImageCheck` and returns a `CheckResult` with a `CheckVerdict` (`Pass`, `Reject` or `Unavailable`). Register new checks in `src/ServiceWiring.php`.
+- `docs/sidecar-api.md` is the contract with the sidecar service (`docs/sidecar-api.openapi.yaml` is the machine-readable version). Change the contract there first.
+- `src/Sidecar/` is the HTTP client for that contract (`SidecarClient`), its response model, and the cached `/v1/info` used on Special:Version.
+- `src/UploadScreener.php` sends an upload to the sidecar once for every check in `$wgUploadSafetyChecks`, then decides the outcome (fail open/closed, always-reject, debug detail).
+- `src/Check/` turns signals into verdicts. Each check has a `CheckEvaluator` (e.g. `NsfwEvaluator`) that returns a `CheckResult` with a `CheckVerdict` (`Pass`, `Reject` or `Unavailable`). Register new evaluators in `src/ServiceWiring.php`.
 - `src/Hooks.php` wires the screener into core's upload hooks.
+
+Adding a check means defining its signal in `docs/sidecar-api.md`, implementing it in the sidecar, then adding an evaluator here.
 
 # Tests
 

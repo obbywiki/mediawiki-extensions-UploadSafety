@@ -3,18 +3,23 @@
 namespace MediaWiki\Extension\UploadSafety;
 
 use MediaWiki\Api\Hook\APIAfterExecuteHook;
+use MediaWiki\Config\Config;
 use MediaWiki\Context\RequestContext;
+use MediaWiki\Extension\UploadSafety\Sidecar\SidecarInfo;
 use MediaWiki\Hook\BeforePageDisplayHook;
 use MediaWiki\Html\Html;
+use MediaWiki\Specials\Hook\SoftwareInfoHook;
 use MediaWiki\Upload\Hook\UploadCompleteHook;
 use MediaWiki\Upload\Hook\UploadVerifyFileHook;
 
-class Hooks implements UploadVerifyFileHook, UploadCompleteHook, BeforePageDisplayHook, APIAfterExecuteHook {
+class Hooks implements UploadVerifyFileHook, UploadCompleteHook, BeforePageDisplayHook, APIAfterExecuteHook, SoftwareInfoHook {
 
 	private const SESSION_KEY = 'uploadsafety-debug';
 
 	public function __construct(
 		private readonly UploadScreener $upload_screener,
+		private readonly SidecarInfo $sidecar_info,
+		private readonly Config $config,
 	) {
 	}
 
@@ -70,6 +75,17 @@ class Hooks implements UploadVerifyFileHook, UploadCompleteHook, BeforePageDispl
 		}
 
 		$module->getResult()->addValue( null, 'uploadsafety', [ 'debug' => $summary, 'rejected' => false ] );
+	}
+
+	/** @inheritDoc */
+	public function onSoftwareInfo( &$software ) {
+		if ( !$this->config->get( 'UploadSafetyShowSidecarVersion' ) ) {
+			return;
+		}
+
+		foreach ( $this->sidecar_info->software_entries() as $name => $version ) {
+			$software[$name] = $version;
+		}
 	}
 
 }
