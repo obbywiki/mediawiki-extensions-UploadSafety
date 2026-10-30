@@ -17,7 +17,9 @@ UploadSafety screens automatically by default:
 * **Core uploads** (Special:Upload, the upload API, UploadWizard and anything else going through `UploadVerifyFile`).
 * **IntegratedProfiles avatars and banners**, through its `IntegratedProfilesVerifyImageUpload` hook (unreleased, needs IntegratedProfiles from `main`). Nothing extra to install; the handler is ignored when IntegratedProfiles is not loaded.
 
-SVG files are not screened, and MediaWiki lets them embed raster images, so any image could be wrapped in one to skip screening, effectively bypassing the entire point of this extension. Uploading SVGs therefore needs the `uploadsafety-upload-svg` right (sysops by default). Everyone else gets an error asking for a PNG, JPEG or WebP instead. SVGs already on the wiki are not affected. If regular users of your wiki heavily utilize SVGs, please open an issue on GitHub.
+Formats the checks cannot screen (SVG, PDF, video, ...) are refused by default, since anything let through untouched is a way around screening. SVGs are the obvious case: MediaWiki lets them embed raster images, so any image could be wrapped in one to skip screening, effectively bypassing the entire point of this extension. Uploading unscreened formats therefore needs the `uploadsafety-upload-unscreened` right (sysops by default), for core uploads and IntegratedProfiles images alike. Everyone else gets an error listing the formats anyone can upload. Files already on the wiki are not affected. If regular users of your wiki heavily utilize SVGs, please open an issue on GitHub.
+
+To open a format to everyone anyway, list its MIME type in `$wgUploadSafetyUnscreenedAllowed` (e.g. `[ 'audio/*' ]`), or set `$wgUploadSafetyBlockUnscreened = false` to allow every unscreened format. A file whose type is screenable but whose content cannot be decoded as an image follows `$wgUploadSafetyFailClosed` instead of passing unscreened.
 
 Other extensions (e.g. a moderation queue) can screen on their own terms through the `UploadSafety.UploadScreener` service, and turn off automatic screening for a surface with `$wgUploadSafetyAutoScreen`.
 
@@ -30,10 +32,10 @@ Ensure `$wgUploadSafetyDebug` is disabled in production as it provides exact cla
 | Format | Handling |
 | --- | --- |
 | PNG, JPEG, GIF, WebP, AVIF, BMP, TIFF | Screened. Animated and multi-page images have their frames sampled (which can be expensive if done frequently). |
-| SVG | Intentionally not screened. Instead, uploadsare gated behind the `uploadsafety-upload-svg` right (see above). |
-| Anything else (HEIC, JPEG XL, PDF, DjVu, video, ...) | Not screened. |
+| SVG | Intentionally not screened. Instead, uploads are gated behind the `uploadsafety-upload-unscreened` right (see above). |
+| Anything else (HEIC, JPEG XL, PDF, DjVu, video, ...) | Not screened; gated behind the same right unless listed in `$wgUploadSafetyUnscreenedAllowed`. |
 
-Formats not listed as screened pass through untouched, so before adding one to `$wgFileExtensions`, make sure it's screened or restricted. AVIF is screened when uploaded as its own file. MediaWiki also allows AVIF (and other raster images) embedded inside SVGs, which the SVG restriction covers. Video is deliberately left to manual moderation: it is rare on these wikis and expensive to screen.
+Adding a format to `$wgFileExtensions` doesn't open it to everyone: until it's screened or listed in `$wgUploadSafetyUnscreenedAllowed`, only users with `uploadsafety-upload-unscreened` can upload it. AVIF is screened when uploaded as its own file. MediaWiki also allows AVIF (and other raster images) embedded inside SVGs, which the restriction covers. Video is deliberately left to manual moderation: it is rare on these wikis and expensive to screen.
 
 ## Rate limits and the rejection log
 
@@ -67,6 +69,8 @@ Calling the `UploadSafety.UploadScreener` service directly (e.g. from a moderati
 | `$wgUploadSafetyMaxFrames` | `64` | Frames of an animated image to analyse (sampled evenly beyond this). |
 | `$wgUploadSafetyTimeout` | `30` | Sidecar timeout in seconds. |
 | `$wgUploadSafetyFailClosed` | `true` | Reject when the sidecar or a check is unavailable. |
+| `$wgUploadSafetyBlockUnscreened` | `true` | Refuse formats the checks cannot screen unless the uploader has `uploadsafety-upload-unscreened`. |
+| `$wgUploadSafetyUnscreenedAllowed` | `[]` | MIME types anyone may upload unscreened; `type/*` matches a whole type. |
 | `$wgUploadSafetyAlwaysReject` | `false` | Reject every image upload without checking. |
 | `$wgUploadSafetyDebug` | `false` | Show scores and failure details in the UI and logs. |
 | `$wgUploadSafetyShowSidecarVersion` | `true` | List the sidecar and runtime versions on Special:Version (never service or model names). |

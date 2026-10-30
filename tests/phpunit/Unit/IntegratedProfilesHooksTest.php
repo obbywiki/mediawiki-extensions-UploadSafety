@@ -12,6 +12,7 @@ use MediaWiki\Extension\UploadSafety\Check\CheckVerdict;
 use MediaWiki\Extension\UploadSafety\IntegratedProfilesHooks;
 use MediaWiki\Extension\UploadSafety\ScreeningResult;
 use MediaWiki\Extension\UploadSafety\Sidecar\SidecarClient;
+use MediaWiki\Extension\UploadSafety\UnscreenedFormats;
 use MediaWiki\Extension\UploadSafety\UploadScreener;
 use MediaWiki\Page\PageReferenceValue;
 use MediaWiki\User\UserIdentityValue;
@@ -35,8 +36,9 @@ class IntegratedProfilesHooksTest extends MediaWikiUnitTestCase {
 	 * @param ScreeningResult|null $result Null when screening must not happen
 	 * @param array<string, mixed> $config
 	 * @param array<int, mixed> &$calls Arguments of each AutoScreening::screen() call
+	 * @param bool $unscreened_allowed What UnscreenedFormats::allows() answers
 	 */
-	private function new_hooks( ?ScreeningResult $result, array $config = [], array &$calls = [] ): IntegratedProfilesHooks {
+	private function new_hooks( ?ScreeningResult $result, array $config = [], array &$calls = [], bool $unscreened_allowed = false ): IntegratedProfilesHooks {
 		$options = new ServiceOptions( UploadScreener::CONSTRUCTOR_OPTIONS, new HashConfig( $config + [
 			'UploadSafetyAlwaysReject' => false,
 			'UploadSafetyDebug' => false,
@@ -58,7 +60,10 @@ class IntegratedProfilesHooksTest extends MediaWikiUnitTestCase {
 			} );
 		}
 
-		return new IntegratedProfilesHooks( $screener, $auto );
+		$formats = $this->createMock( UnscreenedFormats::class );
+		$formats->method( 'allows' )->willReturn( $unscreened_allowed );
+
+		return new IntegratedProfilesHooks( $screener, $auto, $formats );
 	}
 
 	private static function result( CheckVerdict $verdict ): ScreeningResult {
@@ -94,6 +99,23 @@ class IntegratedProfilesHooksTest extends MediaWikiUnitTestCase {
 		$error = null;
 		$ret = $this->new_hooks( null, [ 'UploadSafetyAutoScreen' => [ 'avatar' => false ] ] )
 			->onIntegratedProfilesVerifyImageUpload( 'avatar', '/tmp/x.png', 'image/png', 42, null, $error );
+
+		$this->assertNotFalse( $ret );
+		$this->assertNull( $error );
+	}
+
+	public function test_unscreened_format_is_refused(): void {
+		$error = null;
+		$ret = $this->new_hooks( null )->onIntegratedProfilesVerifyImageUpload( 'avatar', '/tmp/x.svg', 'image/svg+xml', 42, null, $error );
+
+		$this->assertFalse( $ret );
+		$this->assertSame( [ UnscreenedFormats::MSG_RESTRICTED ], $error );
+	}
+
+	public function test_unscreened_format_can_be_allowed(): void {
+		$calls = [];
+		$error = null;
+		$ret = $this->new_hooks( null, [], $calls, true )->onIntegratedProfilesVerifyImageUpload( 'avatar', '/tmp/x.svg', 'image/svg+xml', 42, null, $error );
 
 		$this->assertNotFalse( $ret );
 		$this->assertNull( $error );

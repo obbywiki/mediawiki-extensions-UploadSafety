@@ -132,6 +132,11 @@ class UploadScreener {
 		}
 
 		if ( !ImageTypes::is_raster_image( $file_path ) ) {
+			// a screenable type whose content is not a decodable image must not slip through unscreened
+			if ( $mime !== '' ) {
+				return $this->unavailable( [], 'reason=not-readable-image' );
+			}
+
 			return new ScreeningResult( false, '', [], 'skipped=not-readable-image' );
 		}
 

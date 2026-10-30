@@ -29,12 +29,12 @@
 	},
 	"AvailableRights": [
 		"uploadsafety-log",
-		"uploadsafety-upload-svg"
+		"uploadsafety-upload-unscreened"
 	],
 	"GroupPermissions": {
 		"sysop": {
 			"uploadsafety-log": true,
-			"uploadsafety-upload-svg": true
+			"uploadsafety-upload-unscreened": true
 		}
 	},
 	"LogTypes": [
@@ -76,9 +76,10 @@
 				"MainConfig"
 			]
 		},
-		"svg": {
-			"class": "MediaWiki\\Extension\\UploadSafety\\SvgUploadHooks",
+		"unscreened": {
+			"class": "MediaWiki\\Extension\\UploadSafety\\UnscreenedUploadHooks",
 			"services": [
+				"UploadSafety.UnscreenedFormats",
 				"MimeAnalyzer"
 			]
 		},
@@ -86,13 +87,14 @@
 			"class": "MediaWiki\\Extension\\UploadSafety\\IntegratedProfilesHooks",
 			"services": [
 				"UploadSafety.UploadScreener",
-				"UploadSafety.AutoScreening"
+				"UploadSafety.AutoScreening",
+				"UploadSafety.UnscreenedFormats"
 			]
 		}
 	},
 	"Hooks": {
 		"UploadVerifyFile": "main",
-		"UploadVerifyUpload": "svg",
+		"UploadVerifyUpload": "unscreened",
 		"UploadComplete": "main",
 		"BeforePageDisplay": "main",
 		"APIAfterExecute": "main",
@@ -115,6 +117,14 @@
 				"banner": true
 			},
 			"description": "Surfaces screened automatically: upload (core file uploads), avatar and banner (IntegratedProfiles). Set one to false to stop screening it automatically, e.g. when another extension calls the UploadSafety.UploadScreener service itself. Surfaces not listed are screened."
+		},
+		"UploadSafetyBlockUnscreened": {
+			"value": true,
+			"description": "When true, uploads in formats the checks cannot screen (SVG, PDF, video, ...) are refused unless the uploader has the uploadsafety-upload-unscreened right or the format is in $wgUploadSafetyUnscreenedAllowed. When false, they are allowed unscreened."
+		},
+		"UploadSafetyUnscreenedAllowed": {
+			"value": [],
+			"description": "MIME types anyone may upload even though they are not screened, e.g. [ \"audio/*\", \"application/pdf\" ]. A trailing /* matches a whole type. Only used when $wgUploadSafetyBlockUnscreened is true."
 		},
 		"UploadSafetyChecks": {
 			"value": {

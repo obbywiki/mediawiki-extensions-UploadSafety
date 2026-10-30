@@ -14,13 +14,13 @@
 	"uploadsafety-upload-screen-limited-debug": "Debug version of {{msg-mw|uploadsafety-upload-screen-limited}}. $1 is screening detail.",
 	"uploadsafety-upload-reject-limited": "Error shown when a user had too many images rejected recently and uploads are refused until the limit resets.",
 	"uploadsafety-upload-reject-limited-debug": "Debug version of {{msg-mw|uploadsafety-upload-reject-limited}}. $1 is screening detail.",
-	"uploadsafety-upload-svg-restricted": "Upload error shown to users without the uploadsafety-upload-svg right when they upload an SVG file.",
+	"uploadsafety-upload-unscreened-restricted": "Upload error shown to users without the uploadsafety-upload-unscreened right when they upload a file in a format that is not screened (e.g. SVG, PDF, video).",
 	"log-name-uploadsafety": "{{doc-logpage}}\nName of the upload safety log.",
 	"log-description-uploadsafety": "Description of the upload safety log, shown at the top of Special:Log/uploadsafety.",
 	"logentry-uploadsafety-reject": "{{Logentry}}\nParameters:\n* $4 - surface (upload, avatar, banner)\n* $5 - name of the check that rejected the image (e.g. nsfw)\n* $6 - score reported by that check\n* $7 - SHA-1 of the rejected file",
 	"logentry-uploadsafety-limited": "{{Logentry}}\nParameters:\n* $4 - surface of the upload that reached the limit\n* $5 - name of the rate limit (uploadsafety-reject or uploadsafety-reject-daily)",
 	"right-uploadsafety-log": "{{doc-right|uploadsafety-log}}",
 	"action-uploadsafety-log": "{{doc-action|uploadsafety-log}}",
-	"right-uploadsafety-upload-svg": "{{doc-right|uploadsafety-upload-svg}}",
-	"action-uploadsafety-upload-svg": "{{doc-action|uploadsafety-upload-svg}}"
+	"right-uploadsafety-upload-unscreened": "{{doc-right|uploadsafety-upload-unscreened}}",
+	"action-uploadsafety-upload-unscreened": "{{doc-action|uploadsafety-upload-unscreened}}"
 }

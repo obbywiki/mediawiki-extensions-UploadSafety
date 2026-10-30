@@ -25,7 +25,7 @@ As for everything else, see: <https://github.com/obbywiki/standards>
 - `src/UploadScreener.php` sends an upload to the sidecar once for every check in `$wgUploadSafetyChecks`, then decides the outcome (fail open/closed, always-reject, debug detail).
 - `src/Check/` turns signals into verdicts. Each check has a `CheckEvaluator` (e.g. `NsfwEvaluator`) that returns a `CheckResult` with a `CheckVerdict` (`Pass`, `Reject` or `Unavailable`). Register new evaluators in `src/ServiceWiring.php`.
 - `src/AutoScreening.php` is automatic screening: rate limits, the verdict cache and `src/RejectionLog.php` around the screener. The screener itself stays free of side effects so other callers (e.g. a moderation queue) can use it on their own terms.
-- `src/Hooks.php` wires automatic screening into core's upload hooks, and `src/IntegratedProfilesHooks.php` into IntegratedProfiles avatar and banner uploads. The latter is a separate handler so the IntegratedProfiles interface is only loaded when that extension runs the hook. `src/SvgUploadHooks.php` restricts SVG uploads to the `uploadsafety-upload-svg` right.
+- `src/Hooks.php` wires automatic screening into core's upload hooks, and `src/IntegratedProfilesHooks.php` into IntegratedProfiles avatar and banner uploads. The latter is a separate handler so the IntegratedProfiles interface is only loaded when that extension runs the hook. `src/UnscreenedFormats.php` decides who may upload formats the checks cannot screen; `src/UnscreenedUploadHooks.php` applies it to core uploads, and the IntegratedProfiles handler to avatars and banners.
 
 Adding a check means defining its signal in `docs/sidecar-api.md`, implementing it in the sidecar, then adding an evaluator here.
 

@@ -6,6 +6,7 @@ use MediaWiki\Extension\UploadSafety\Check\NsfwEvaluator;
 use MediaWiki\Extension\UploadSafety\RejectionLog;
 use MediaWiki\Extension\UploadSafety\Sidecar\SidecarClient;
 use MediaWiki\Extension\UploadSafety\Sidecar\SidecarInfo;
+use MediaWiki\Extension\UploadSafety\UnscreenedFormats;
 use MediaWiki\Extension\UploadSafety\UploadScreener;
 use MediaWiki\Logger\LoggerFactory;
 use MediaWiki\MediaWikiServices;
@@ -40,6 +41,15 @@ return [
 				new NsfwEvaluator(),
 			],
 			LoggerFactory::getInstance( 'UploadSafety' )
+		);
+	},
+
+	'UploadSafety.UnscreenedFormats' => static function ( MediaWikiServices $services ): UnscreenedFormats {
+		return new UnscreenedFormats(
+			new ServiceOptions(
+				UnscreenedFormats::CONSTRUCTOR_OPTIONS,
+				$services->getMainConfig()
+			)
 		);
 	},
 

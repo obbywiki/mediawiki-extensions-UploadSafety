@@ -3,7 +3,8 @@
 namespace MediaWiki\Extension\UploadSafety;
 
 /**
- * Decides which uploads are raster images the checks can decode. SVG and other `image/*` drawing formats are excluded.
+ * Decides which uploads are raster images the checks can decode. SVG and other `image/*` drawing formats are excluded,
+ * and are handled by UnscreenedFormats instead.
  */
 class ImageTypes {
 
@@ -50,7 +51,10 @@ class ImageTypes {
 		return $image_type !== false && in_array( $image_type, self::SCREENABLE_IMAGE_TYPES, true );
 	}
 
-	private static function normalize_mime( string $mime ): string {
+	/**
+	 * Lowercase MIME type without parameters.
+	 */
+	public static function normalize_mime( string $mime ): string {
 		$mime = strtolower( trim( $mime ) );
 		$semicolon = strpos( $mime, ';' );
 		if ( $semicolon !== false ) {

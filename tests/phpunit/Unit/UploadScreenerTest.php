@@ -180,9 +180,16 @@ class UploadScreenerTest extends MediaWikiUnitTestCase {
 		);
 	}
 
-	public function test_non_raster_content_is_skipped(): void {
+	public function test_non_raster_content_under_a_raster_mime_follows_fail_policy(): void {
 		file_put_contents( $this->png_path, '<svg xmlns="http://www.w3.org/2000/svg"/>' );
-		$result = $this->new_screener( null )->screen( $this->png_path, 'image/png' );
+
+		$this->assertTrue( $this->new_screener( null )->screen( $this->png_path, 'image/png' )->rejected );
+		$this->assertFalse( $this->new_screener( null, [ 'UploadSafetyFailClosed' => false ] )->screen( $this->png_path, 'image/png' )->rejected );
+	}
+
+	public function test_non_raster_content_without_a_mime_is_skipped(): void {
+		file_put_contents( $this->png_path, '<svg xmlns="http://www.w3.org/2000/svg"/>' );
+		$result = $this->new_screener( null )->screen( $this->png_path );
 
 		$this->assertFalse( $result->rejected );
 		$this->assertTrue( $result->skipped() );

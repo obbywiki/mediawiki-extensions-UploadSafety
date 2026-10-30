@@ -2,6 +2,7 @@
 
 namespace MediaWiki\Extension\UploadSafety;
 
+use MediaWiki\Context\RequestContext;
 use MediaWiki\Extension\IntegratedProfiles\Hook\IntegratedProfilesVerifyImageUploadHook;
 use MediaWiki\Page\PageReferenceValue;
 use MediaWiki\User\UserIdentity;
@@ -15,12 +16,22 @@ class IntegratedProfilesHooks implements IntegratedProfilesVerifyImageUploadHook
 	public function __construct(
 		private readonly UploadScreener $upload_screener,
 		private readonly AutoScreening $auto_screening,
+		private readonly UnscreenedFormats $unscreened_formats,
 	) {
 	}
 
 	/** @inheritDoc */
 	public function onIntegratedProfilesVerifyImageUpload( string $kind, string $path, string $mime, int $central_id, ?UserIdentity $user, &$error ) {
-		if ( !$this->upload_screener->auto_screens( $kind ) || !ImageTypes::is_screenable_mime( $mime ) ) {
+		if ( !ImageTypes::is_screenable_mime( $mime ) ) {
+			if ( $this->unscreened_formats->allows( $mime, RequestContext::getMain()->getAuthority() ) ) {
+				return;
+			}
+			$error = [ UnscreenedFormats::MSG_RESTRICTED ];
+
+			return false;
+		}
+
+		if ( !$this->upload_screener->auto_screens( $kind ) ) {
 			return;
 		}
 
