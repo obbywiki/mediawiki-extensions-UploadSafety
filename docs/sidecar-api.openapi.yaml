@@ -172,7 +172,7 @@ components:
           properties:
             status:
               const: error
-      description: When status is ok, the remaining fields follow the check's signal schema (e.g. NsfwSignal).
+      description: When status is ok, the remaining fields follow the check's signal schema (NsfwSignal, NudityRegionsSignal).
     NsfwSignal:
       type: object
       required: [ status, score, frame ]
@@ -198,6 +198,44 @@ components:
                 type: string
               score:
                 type: number
+    NudityRegionsSignal:
+      type: object
+      required: [ status, regions ]
+      properties:
+        status:
+          const: ok
+        min_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        model:
+          type: string
+        regions:
+          type: array
+          description: Highest-scoring region per label over all analysed frames, highest score first.
+          items:
+            type: object
+            required: [ label, score, frame, box ]
+            properties:
+              label:
+                type: string
+                description: Clients must ignore labels they do not know.
+                examples: [ genitalia_exposed, breast_exposed, buttocks_exposed, anus_exposed, genitalia_covered, breast_covered, buttocks_covered, anus_covered ]
+              score:
+                type: number
+                minimum: 0
+                maximum: 1
+              frame:
+                type: integer
+                minimum: 0
+              box:
+                type: array
+                description: '[x, y, width, height] in source pixels'
+                minItems: 4
+                maxItems: 4
+                items:
+                  type: integer
+                  minimum: 0
     Info:
       type: object
       required: [ service, checks ]
