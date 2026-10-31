@@ -145,6 +145,10 @@
 			"merge_strategy": "provide_default",
 			"description": "Checks to run, as name => parameters. Setting this replaces the default entirely. nsfw: reject when the score is >= threshold. nudity_regions: reject when a region's score is >= the threshold for its label (labels left out of thresholds are ignored). With suspect, scores from there up to the threshold are doubtful, see UploadSafetySuspectsToReject."
 		},
+		"UploadSafetySurfaces": {
+			"value": {},
+			"description": "Per-surface overrides (upload, avatar, banner, ...), as surface => [ 'checks' => ..., 'suspects_to_reject' => ... ]. Each key replaces UploadSafetyChecks or UploadSafetySuspectsToReject for that surface, and keys that are left out use the global setting."
+		},
 		"UploadSafetySuspectsToReject": {
 			"value": 2,
 			"description": "How many checks have to find an upload doubtful (score >= their suspect level) at once to reject it. 1 rejects on any doubtful check. Allowed uploads with doubtful checks are recorded in the upload safety log for review."

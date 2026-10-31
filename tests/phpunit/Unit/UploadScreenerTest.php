@@ -64,6 +64,7 @@ class UploadScreenerTest extends MediaWikiUnitTestCase {
 			'UploadSafetyAutoScreen' => [ 'upload' => true, 'avatar' => true, 'banner' => true ],
 			'UploadSafetyMaxFrames' => 64,
 			'UploadSafetySuspectsToReject' => 2,
+			'UploadSafetySurfaces' => [],
 		] ) );
 
 		return new UploadScreener( $options, $sidecar, [ new NsfwEvaluator(), new NudityRegionsEvaluator() ], new NullLogger() );
@@ -245,7 +246,43 @@ class UploadScreenerTest extends MediaWikiUnitTestCase {
 	public function test_enabled_checks_accepts_shorthand_and_disabled_entries(): void {
 		$screener = $this->new_screener( null, [ 'UploadSafetyChecks' => [ 'nsfw', 'ocr' => false, 'qr' => [ 'x' => 1 ] ] ] );
 
-		$this->assertSame( [ 'nsfw' => [], 'qr' => [ 'x' => 1 ] ], $screener->enabled_checks() );
+		$this->assertSame( [ 'nsfw' => [], 'qr' => [ 'x' => 1 ] ], $screener->enabled_checks( 'upload' ) );
+	}
+
+	public function test_surface_can_override_checks(): void {
+		$sidecar = $this->createMock( SidecarClient::class );
+		$sidecar->expects( $this->once() )->method( 'check' )
+			->with( $this->png_path, [ 'nudity_regions' ], 'image/png', 'avatar' )
+			->willReturn( self::response( [ 'nudity_regions' => self::regions( 0.25 ) ] ) );
+		$options = new ServiceOptions( UploadScreener::CONSTRUCTOR_OPTIONS, new HashConfig( [
+			'UploadSafetyAlwaysReject' => false,
+			'UploadSafetyDebug' => false,
+			'UploadSafetyFailClosed' => true,
+			'UploadSafetyChecks' => self::BOTH_CHECKS,
+			'UploadSafetyAutoScreen' => [],
+			'UploadSafetyMaxFrames' => 64,
+			'UploadSafetySuspectsToReject' => 2,
+			'UploadSafetySurfaces' => [
+				'avatar' => [ 'checks' => [ 'nudity_regions' => [ 'thresholds' => [ 'breast_exposed' => 0.3 ], 'suspect' => 0.2 ] ], 'suspects_to_reject' => 1 ],
+			],
+		] ) );
+
+		$result = ( new UploadScreener( $options, $sidecar, [ new NsfwEvaluator(), new NudityRegionsEvaluator() ], new NullLogger() ) )
+			->screen( $this->png_path, 'image/png', 'Avatar.png', 'avatar' );
+
+		$this->assertTrue( $result->rejected, 'one doubtful check is enough on avatars' );
+		$this->assertSame( [ 'nudity_regions' ], array_keys( $result->checks ) );
+	}
+
+	public function test_surface_can_override_only_suspects_to_reject(): void {
+		$screener = $this->new_screener(
+			self::response( [ 'nsfw' => self::nsfw( 0.6 ), 'nudity_regions' => self::regions() ] ),
+			[ 'UploadSafetyChecks' => self::BOTH_CHECKS, 'UploadSafetySurfaces' => [ 'banner' => [ 'suspects_to_reject' => 1 ] ] ]
+		);
+
+		$this->assertTrue( $screener->screen( $this->png_path, 'image/png', '', 'banner' )->rejected );
+		$this->assertFalse( $screener->screen( $this->png_path, 'image/png', '', 'upload' )->rejected, 'other surfaces keep the global setting' );
+		$this->assertSame( self::BOTH_CHECKS, $screener->enabled_checks( 'banner' ) );
 	}
 
 	public function test_unreadable_file_follows_fail_policy(): void {

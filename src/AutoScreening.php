@@ -77,7 +77,7 @@ class AutoScreening {
 		}
 
 		$sha1 = is_readable( $file_path ) ? sha1_file( $file_path ) : false;
-		$cache_key = is_string( $sha1 ) ? $this->cache_key( $sha1 ) : null;
+		$cache_key = is_string( $sha1 ) ? $this->cache_key( $sha1, $surface ) : null;
 
 		$cached = $cache_key !== null ? ScreeningResult::from_array( $this->cache->get( $cache_key ) ) : null;
 		if ( $cached !== null ) {
@@ -126,9 +126,13 @@ class AutoScreening {
 		}
 	}
 
-	private function cache_key( string $sha1 ): string {
-		// verdicts depend on the checks and their parameters, so changing them invalidates the cache
-		$fingerprint = md5( json_encode( [ $this->screener->enabled_checks(), $this->screener->max_frames(), $this->screener->suspects_to_reject() ] ) );
+	private function cache_key( string $sha1, string $surface ): string {
+		// verdicts depend on the surface's checks and their parameters, so changing them invalidates the cache, and a file screened under one surface's settings is not reused under another's
+		$fingerprint = md5( json_encode( [
+			$this->screener->enabled_checks( $surface ),
+			$this->screener->max_frames(),
+			$this->screener->suspects_to_reject( $surface ),
+		] ) );
 
 		return $this->cache->makeKey( 'uploadsafety', 'verdict', $sha1, $fingerprint );
 	}

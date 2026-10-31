@@ -92,6 +92,7 @@ class AutoScreeningTest extends MediaWikiUnitTestCase {
 			'UploadSafetyAutoScreen' => [],
 			'UploadSafetyMaxFrames' => 64,
 			'UploadSafetySuspectsToReject' => 2,
+			'UploadSafetySurfaces' => [],
 		] ) );
 		$screener = new UploadScreener( $options, $sidecar, [ new NsfwEvaluator() ], new NullLogger() );
 
@@ -213,6 +214,20 @@ class AutoScreeningTest extends MediaWikiUnitTestCase {
 		$result = $this->upload( $this->new_auto( [ 'UploadSafetyChecks' => [ 'nsfw' => [ 'threshold' => 0.95 ] ] ] ) );
 
 		$this->assertFalse( $result->rejected );
+		$this->assertSame( 2, $this->sidecar_calls );
+	}
+
+	public function test_cached_verdicts_are_not_shared_between_surfaces_with_different_settings(): void {
+		$auto = $this->new_auto( [
+			'UploadSafetyChecks' => [ 'nsfw' => [ 'threshold' => 0.98, 'suspect' => 0.5 ] ],
+			'UploadSafetySurfaces' => [ 'avatar' => [ 'suspects_to_reject' => 1 ] ],
+		] );
+		$this->scores = [ 0.7, 0.7 ];
+
+		$this->assertFalse( $this->upload( $auto )->rejected );
+		$avatar = $auto->screen( $this->performer(), $this->png_path, 'image/png', 'Avatar.png', 'avatar' );
+
+		$this->assertTrue( $avatar->rejected );
 		$this->assertSame( 2, $this->sidecar_calls );
 	}
 

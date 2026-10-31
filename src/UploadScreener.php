@@ -26,6 +26,7 @@ class UploadScreener {
 		'UploadSafetyAutoScreen',
 		'UploadSafetyMaxFrames',
 		'UploadSafetySuspectsToReject',
+		'UploadSafetySurfaces',
 	];
 
 	public const MSG_REJECTED = 'uploadsafety-upload-rejected';
@@ -84,10 +85,22 @@ class UploadScreener {
 	}
 
 	/**
-	 * How many checks have to be doubtful at once to reject an upload.
+	 * How many checks have to be doubtful at once to reject an upload from $surface.
 	 */
-	public function suspects_to_reject(): int {
-		return max( 1, (int)$this->options->get( 'UploadSafetySuspectsToReject' ) );
+	public function suspects_to_reject( string $surface ): int {
+		$value = $this->surface_setting( $surface, 'suspects_to_reject' ) ?? $this->options->get( 'UploadSafetySuspectsToReject' );
+
+		return max( 1, (int)$value );
+	}
+
+	/**
+	 * A $wgUploadSafetySurfaces setting for $surface, or null when the surface does not override it.
+	 */
+	private function surface_setting( string $surface, string $key ): mixed {
+		$surfaces = $this->options->get( 'UploadSafetySurfaces' );
+		$entry = is_array( $surfaces ) ? ( $surfaces[$surface] ?? null ) : null;
+
+		return is_array( $entry ) ? ( $entry[$key] ?? null ) : null;
 	}
 
 	public function max_frames(): int {
@@ -106,12 +119,13 @@ class UploadScreener {
 	}
 
 	/**
-	 * Enabled checks and their parameters, from $wgUploadSafetyChecks. Accepts `[ 'nsfw' ]` as shorthand for `[ 'nsfw' => [] ]`.
+	 * Enabled checks for $surface and their parameters, from $wgUploadSafetySurfaces or else $wgUploadSafetyChecks.
+	 * Accepts `[ 'nsfw' ]` as shorthand for `[ 'nsfw' => [] ]`.
 	 *
 	 * @return array<string, array<string, mixed>>
 	 */
-	public function enabled_checks(): array {
-		$config = $this->options->get( 'UploadSafetyChecks' );
+	public function enabled_checks( string $surface ): array {
+		$config = $this->surface_setting( $surface, 'checks' ) ?? $this->options->get( 'UploadSafetyChecks' );
 		if ( !is_array( $config ) ) {
 			return [];
 		}
@@ -150,7 +164,7 @@ class UploadScreener {
 			return new ScreeningResult( false, '', [], 'skipped=not-readable-image' );
 		}
 
-		$checks = $this->enabled_checks();
+		$checks = $this->enabled_checks( $surface );
 		if ( $checks === [] ) {
 			return new ScreeningResult( false, '', [], 'skipped=no-checks' );
 		}
@@ -176,7 +190,7 @@ class UploadScreener {
 		}
 
 		$suspects = count( array_filter( $results, static fn ( CheckResult $result ) => $result->verdict === CheckVerdict::Suspect ) );
-		if ( $suspects >= $this->suspects_to_reject() ) {
+		if ( $suspects >= $this->suspects_to_reject( $surface ) ) {
 			return new ScreeningResult( true, self::MSG_REJECTED, $results, trim( $detail . ' suspects=' . $suspects ) );
 		}
 
