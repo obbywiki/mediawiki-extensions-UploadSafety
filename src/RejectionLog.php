@@ -2,6 +2,7 @@
 
 namespace MediaWiki\Extension\UploadSafety;
 
+use MediaWiki\Extension\UploadSafety\Check\CheckResult;
 use MediaWiki\Logging\ManualLogEntry;
 use MediaWiki\Page\PageReference;
 use MediaWiki\User\UserIdentity;
@@ -25,16 +26,43 @@ class RejectionLog {
 	 * @param bool $repeat Whether the same file was already rejected recently
 	 */
 	public function reject( UserIdentity $performer, PageReference $target, string $surface, ScreeningResult $result, string $sha1, bool $repeat ): void {
-		[ $check, $check_result ] = $result->rejecting_check() ?? [ '', null ];
-		$score = $check_result?->score;
+		$this->insert( 'reject', $performer, $target, self::check_params( $surface, $result->rejecting_checks(), $sha1, $repeat ) );
+	}
 
-		$this->insert( 'reject', $performer, $target, [
+	/**
+	 * An upload was allowed, but some checks found it doubtful. The file is kept, so moderators can review it.
+	 *
+	 * @param UserIdentity $performer Uploader
+	 * @param PageReference $target `File:` page for uploads, profile owner's user page for avatars and banners
+	 * @param string $surface upload, avatar, banner, ...
+	 * @param ScreeningResult $result
+	 * @param string $sha1 Hex SHA-1 of the uploaded file
+	 * @param bool $repeat Whether the same file was already screened recently
+	 */
+	public function suspect( UserIdentity $performer, PageReference $target, string $surface, ScreeningResult $result, string $sha1, bool $repeat ): void {
+		$this->insert( 'suspect', $performer, $target, self::check_params( $surface, $result->suspect_checks(), $sha1, $repeat ) );
+	}
+
+	/**
+	 * @param string $surface
+	 * @param array<string, CheckResult> $checks
+	 * @param string $sha1
+	 * @param bool $repeat
+	 * @return array<string, mixed>
+	 */
+	private static function check_params( string $surface, array $checks, string $sha1, bool $repeat ): array {
+		$scores = array_map(
+			static fn ( CheckResult $result ) => $result->score === null ? '?' : rtrim( rtrim( sprintf( '%.4f', $result->score ), '0' ), '.' ),
+			$checks
+		);
+
+		return [
 			'4::surface' => $surface,
-			'5::check' => $check,
-			'6::score' => $score === null ? '' : rtrim( rtrim( sprintf( '%.4f', $score ), '0' ), '.' ),
+			'5::check' => implode( ', ', array_keys( $checks ) ),
+			'6::score' => implode( ', ', $scores ),
 			'7::sha1' => $sha1,
 			'repeat' => $repeat,
-		] );
+		];
 	}
 
 	/**

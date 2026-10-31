@@ -91,6 +91,7 @@ class AutoScreeningTest extends MediaWikiUnitTestCase {
 			'UploadSafetyChecks' => [ 'nsfw' => [ 'threshold' => 0.5 ] ],
 			'UploadSafetyAutoScreen' => [],
 			'UploadSafetyMaxFrames' => 64,
+			'UploadSafetySuspectsToReject' => 2,
 		] ) );
 		$screener = new UploadScreener( $options, $sidecar, [ new NsfwEvaluator() ], new NullLogger() );
 
@@ -105,7 +106,7 @@ class AutoScreeningTest extends MediaWikiUnitTestCase {
 		} );
 
 		$log = $this->createMock( RejectionLog::class );
-		foreach ( [ 'reject', 'limited' ] as $action ) {
+		foreach ( [ 'reject', 'suspect', 'limited' ] as $action ) {
 			$log->method( $action )->willReturnCallback( function ( ...$args ) use ( $action ) {
 				$this->logged[] = [ $action, $args ];
 			} );
@@ -165,6 +166,32 @@ class AutoScreeningTest extends MediaWikiUnitTestCase {
 		$this->assertSame( 'upload', $args[2] );
 		$this->assertSame( sha1( self::PNG_1X1 ), $args[4] );
 		$this->assertFalse( $args[5], 'not a repeat' );
+	}
+
+	public function test_doubtful_upload_is_allowed_and_logged_for_review(): void {
+		$auto = $this->new_auto( [ 'UploadSafetyChecks' => [ 'nsfw' => [ 'threshold' => 0.98, 'suspect' => 0.5 ] ] ] );
+		$this->scores = [ 0.7 ];
+		$result = $this->upload( $auto );
+		$this->upload( $auto );
+
+		$this->assertFalse( $result->rejected );
+		$this->assertArrayNotHasKey( AutoScreening::LIMIT_REJECT, $this->counts );
+		$this->assertSame( [ 'suspect', 'suspect' ], array_column( $this->logged, 0 ) );
+		$this->assertFalse( $this->logged[0][1][5], 'not a repeat' );
+		$this->assertTrue( $this->logged[1][1][5], 'cached verdict logged as a repeat' );
+		$this->assertSame( 1, $this->sidecar_calls );
+	}
+
+	public function test_doubtful_checks_that_reject_are_logged_and_counted_as_rejections(): void {
+		$auto = $this->new_auto( [
+			'UploadSafetyChecks' => [ 'nsfw' => [ 'threshold' => 0.98, 'suspect' => 0.5 ] ],
+			'UploadSafetySuspectsToReject' => 1,
+		] );
+		$this->scores = [ 0.7 ];
+
+		$this->assertTrue( $this->upload( $auto )->rejected );
+		$this->assertSame( [ 'reject' ], array_column( $this->logged, 0 ) );
+		$this->assertSame( 1, $this->counts[AutoScreening::LIMIT_REJECT] );
 	}
 
 	public function test_same_file_reuses_the_verdict_without_counting(): void {

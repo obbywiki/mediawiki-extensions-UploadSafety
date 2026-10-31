@@ -6,6 +6,7 @@ namespace MediaWiki\Extension\UploadSafety\Check;
  * `nudity_regions` check: rejects when a reported region's label has a threshold and its score is at or above it.
  *
  * Parameters: `thresholds` maps region labels to thresholds (default: the `*_exposed` labels at 0.3). Setting it replaces the default entirely, so labels left out are ignored.
+ * With `suspect`, regions of those labels scoring from there up to their threshold are doubtful (CheckVerdict::Suspect).
  */
 class NudityRegionsEvaluator implements CheckEvaluator {
 
@@ -26,6 +27,12 @@ class NudityRegionsEvaluator implements CheckEvaluator {
 			return CheckResult::unavailable( 'reason=invalid-config field=thresholds' );
 		}
 
+		$suspect = $params['suspect'] ?? null;
+		if ( $suspect !== null && !is_numeric( $suspect ) ) {
+			return CheckResult::unavailable( 'reason=invalid-config field=suspect' );
+		}
+		$suspect = $suspect !== null ? (float)$suspect : null;
+
 		$regions = self::regions( $signal['regions'] ?? null );
 		if ( $regions === null ) {
 			return CheckResult::unavailable( 'reason=invalid-signal field=regions' );
@@ -33,16 +40,27 @@ class NudityRegionsEvaluator implements CheckEvaluator {
 
 		// regions under the sidecar's min_score are never reported, so a lower threshold could not be honoured
 		$min_score = $signal['min_score'] ?? null;
-		if ( ( is_int( $min_score ) || is_float( $min_score ) ) && $thresholds !== [] && min( $thresholds ) < $min_score ) {
+		$lowest = $thresholds === [] ? null : min( [ ...array_values( $thresholds ), ...( $suspect !== null ? [ $suspect ] : [] ) ] );
+		if ( ( is_int( $min_score ) || is_float( $min_score ) ) && $lowest !== null && $lowest < $min_score ) {
 			return CheckResult::unavailable( 'reason=threshold-below-min-score min_score=' . $min_score );
 		}
 
 		// the configured region closest to (or furthest over) its threshold
 		$top = null;
+		$verdict = CheckVerdict::Pass;
 		foreach ( $regions as $region ) {
 			$threshold = $thresholds[$region['label']] ?? null;
-			if ( $threshold !== null && ( $top === null || $region['score'] - $threshold > $top['score'] - $top['threshold'] ) ) {
+			if ( $threshold === null ) {
+				continue;
+			}
+			if ( $top === null || $region['score'] - $threshold > $top['score'] - $top['threshold'] ) {
 				$top = $region + [ 'threshold' => $threshold ];
+			}
+
+			if ( $region['score'] >= $threshold ) {
+				$verdict = CheckVerdict::Reject;
+			} elseif ( $suspect !== null && $region['score'] >= $suspect && $verdict === CheckVerdict::Pass ) {
+				$verdict = CheckVerdict::Suspect;
 			}
 		}
 
@@ -51,7 +69,7 @@ class NudityRegionsEvaluator implements CheckEvaluator {
 			return new CheckResult( CheckVerdict::Pass, '', null, $scores, 'configured-regions=none' );
 		}
 
-		$detail = 'threshold=' . $top['threshold'];
+		$detail = 'threshold=' . $top['threshold'] . ( $suspect !== null ? ' suspect=' . $suspect : '' );
 		if ( $top['frame'] !== null ) {
 			$detail .= ' frame=' . $top['frame'];
 		}
@@ -60,7 +78,7 @@ class NudityRegionsEvaluator implements CheckEvaluator {
 		}
 
 		return new CheckResult(
-			$top['score'] >= $top['threshold'] ? CheckVerdict::Reject : CheckVerdict::Pass,
+			$verdict,
 			$top['label'],
 			$top['score'],
 			$scores,

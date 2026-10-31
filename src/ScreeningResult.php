@@ -25,19 +25,39 @@ class ScreeningResult {
 	}
 
 	/**
-	 * Name and result of the first check that rejected the upload, or null when no check did
-	 * (allowed, unavailable, or rejected by the screener itself).
+	 * The checks that rejected the upload: those over their threshold, or else the doubtful ones that rejected it together.
+	 * Empty when no check did (allowed, unavailable, or rejected by the screener itself).
 	 *
-	 * @return array{0: string, 1: CheckResult}|null
+	 * @return array<string, CheckResult>
 	 */
-	public function rejecting_check(): ?array {
-		foreach ( $this->checks as $name => $result ) {
-			if ( $result->verdict === CheckVerdict::Reject ) {
-				return [ $name, $result ];
-			}
+	public function rejecting_checks(): array {
+		if ( !$this->rejected ) {
+			return [];
 		}
 
-		return null;
+		$rejecting = $this->with_verdict( CheckVerdict::Reject );
+		if ( $rejecting !== [] ) {
+			return $rejecting;
+		}
+
+		// rejected with doubtful checks but no rejecting one: the suspects were enough, unless an unavailable check rejected it
+		return str_contains( $this->detail, 'suspects=' ) ? $this->with_verdict( CheckVerdict::Suspect ) : [];
+	}
+
+	/**
+	 * Doubtful checks of an allowed upload, which a moderator may want to look at.
+	 *
+	 * @return array<string, CheckResult>
+	 */
+	public function suspect_checks(): array {
+		return $this->rejected ? [] : $this->with_verdict( CheckVerdict::Suspect );
+	}
+
+	/**
+	 * @return array<string, CheckResult>
+	 */
+	private function with_verdict( CheckVerdict $verdict ): array {
+		return array_filter( $this->checks, static fn ( CheckResult $result ) => $result->verdict === $verdict );
 	}
 
 	/**
@@ -45,7 +65,7 @@ class ScreeningResult {
 	 * a screener mode or an unavailable check.
 	 */
 	public function cacheable(): bool {
-		if ( $this->checks === [] || ( $this->detail !== '' && !str_starts_with( $this->detail, 'frames=' ) ) ) {
+		if ( $this->checks === [] || ( $this->detail !== '' && !preg_match( '/^(frames=\S+ ?)?(suspects=\d+)?$/', $this->detail ) ) ) {
 			return false;
 		}
 

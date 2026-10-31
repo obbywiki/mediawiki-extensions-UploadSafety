@@ -19,6 +19,10 @@ class NsfwEvaluatorTest extends MediaWikiUnitTestCase {
 		yield 'at threshold' => [ [ 'score' => 0.5 ], [ 'threshold' => 0.5 ], CheckVerdict::Reject ];
 		yield 'under threshold' => [ [ 'score' => 0.49 ], [ 'threshold' => 0.5 ], CheckVerdict::Pass ];
 		yield 'default threshold' => [ [ 'score' => 0.5 ], [], CheckVerdict::Reject ];
+		yield 'doubtful' => [ [ 'score' => 0.5 ], [ 'threshold' => 0.98, 'suspect' => 0.5 ], CheckVerdict::Suspect ];
+		yield 'under suspect' => [ [ 'score' => 0.49 ], [ 'threshold' => 0.98, 'suspect' => 0.5 ], CheckVerdict::Pass ];
+		yield 'over threshold with suspect' => [ [ 'score' => 0.99 ], [ 'threshold' => 0.98, 'suspect' => 0.5 ], CheckVerdict::Reject ];
+		yield 'no suspect band by default' => [ [ 'score' => 0.49 ], [], CheckVerdict::Pass ];
 		yield 'integer score' => [ [ 'score' => 0 ], [], CheckVerdict::Pass ];
 		yield 'missing score' => [ [], [], CheckVerdict::Unavailable ];
 		yield 'string score' => [ [ 'score' => '0.9' ], [], CheckVerdict::Unavailable ];

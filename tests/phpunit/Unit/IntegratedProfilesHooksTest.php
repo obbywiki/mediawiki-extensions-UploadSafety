@@ -46,6 +46,7 @@ class IntegratedProfilesHooksTest extends MediaWikiUnitTestCase {
 			'UploadSafetyChecks' => [ 'nsfw' => [] ],
 			'UploadSafetyAutoScreen' => [ 'upload' => true, 'avatar' => true, 'banner' => true ],
 			'UploadSafetyMaxFrames' => 64,
+			'UploadSafetySuspectsToReject' => 2,
 		] ) );
 		$screener = new UploadScreener( $options, $this->createNoOpMock( SidecarClient::class ), [], new NullLogger() );
 

@@ -4,6 +4,7 @@ namespace MediaWiki\Extension\UploadSafety\Check;
 
 /**
  * `nsfw` check: rejects when the worst frame's score is at or above `threshold` (default 0.5).
+ * With `suspect`, scores from there up to the threshold are doubtful (CheckVerdict::Suspect).
  */
 class NsfwEvaluator implements CheckEvaluator {
 
@@ -25,14 +26,22 @@ class NsfwEvaluator implements CheckEvaluator {
 		}
 
 		$threshold = is_numeric( $params['threshold'] ?? null ) ? (float)$params['threshold'] : self::DEFAULT_THRESHOLD;
+		$suspect = is_numeric( $params['suspect'] ?? null ) ? (float)$params['suspect'] : null;
 
-		$detail = 'threshold=' . $threshold;
+		$verdict = CheckVerdict::Pass;
+		if ( $score >= $threshold ) {
+			$verdict = CheckVerdict::Reject;
+		} elseif ( $suspect !== null && $score >= $suspect ) {
+			$verdict = CheckVerdict::Suspect;
+		}
+
+		$detail = 'threshold=' . $threshold . ( $suspect !== null ? ' suspect=' . $suspect : '' );
 		if ( is_int( $signal['frame'] ?? null ) ) {
 			$detail .= ' frame=' . $signal['frame'];
 		}
 
 		return new CheckResult(
-			$score >= $threshold ? CheckVerdict::Reject : CheckVerdict::Pass,
+			$verdict,
 			'nsfw',
 			$score,
 			self::labels( $signal['labels'] ?? null ),

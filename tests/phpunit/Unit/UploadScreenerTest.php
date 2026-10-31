@@ -5,7 +5,9 @@ namespace MediaWiki\Extension\UploadSafety\Tests\Unit;
 
 use MediaWiki\Config\HashConfig;
 use MediaWiki\Config\ServiceOptions;
+use MediaWiki\Extension\UploadSafety\Check\CheckVerdict;
 use MediaWiki\Extension\UploadSafety\Check\NsfwEvaluator;
+use MediaWiki\Extension\UploadSafety\Check\NudityRegionsEvaluator;
 use MediaWiki\Extension\UploadSafety\Sidecar\SidecarClient;
 use MediaWiki\Extension\UploadSafety\Sidecar\SidecarResponse;
 use MediaWiki\Extension\UploadSafety\Sidecar\SidecarUnavailableException;
@@ -61,9 +63,10 @@ class UploadScreenerTest extends MediaWikiUnitTestCase {
 			'UploadSafetyChecks' => [ 'nsfw' => [ 'threshold' => 0.5 ] ],
 			'UploadSafetyAutoScreen' => [ 'upload' => true, 'avatar' => true, 'banner' => true ],
 			'UploadSafetyMaxFrames' => 64,
+			'UploadSafetySuspectsToReject' => 2,
 		] ) );
 
-		return new UploadScreener( $options, $sidecar, [ new NsfwEvaluator() ], new NullLogger() );
+		return new UploadScreener( $options, $sidecar, [ new NsfwEvaluator(), new NudityRegionsEvaluator() ], new NullLogger() );
 	}
 
 	/**
@@ -92,6 +95,80 @@ class UploadScreenerTest extends MediaWikiUnitTestCase {
 
 		$this->assertTrue( $result->rejected );
 		$this->assertSame( UploadScreener::MSG_REJECTED, $result->message_key );
+	}
+
+	private const BOTH_CHECKS = [
+		'nsfw' => [ 'threshold' => 0.98, 'suspect' => 0.5 ],
+		'nudity_regions' => [ 'thresholds' => [ 'breast_exposed' => 0.3 ], 'suspect' => 0.2 ],
+	];
+
+	private static function regions( float ...$scores ): array {
+		return [
+			'status' => 'ok',
+			'min_score' => 0.2,
+			'regions' => array_map( static fn ( float $score ) => [ 'label' => 'breast_exposed', 'score' => $score, 'frame' => 0, 'box' => [ 0, 0, 1, 1 ] ], $scores ),
+		];
+	}
+
+	public function test_one_doubtful_check_allows_and_is_reported(): void {
+		$result = $this->new_screener(
+			self::response( [ 'nsfw' => self::nsfw( 0.95 ), 'nudity_regions' => self::regions() ] ),
+			[ 'UploadSafetyChecks' => self::BOTH_CHECKS ]
+		)->screen( $this->png_path, 'image/png' );
+
+		$this->assertFalse( $result->rejected );
+		$this->assertSame( CheckVerdict::Suspect, $result->checks['nsfw']->verdict );
+		$this->assertSame( [ 'nsfw' ], array_keys( $result->suspect_checks() ) );
+		$this->assertSame( [], $result->rejecting_checks() );
+		$this->assertTrue( $result->cacheable() );
+	}
+
+	public function test_doubtful_checks_together_reject(): void {
+		$result = $this->new_screener(
+			self::response( [ 'nsfw' => self::nsfw( 0.6 ), 'nudity_regions' => self::regions( 0.25 ) ] ),
+			[ 'UploadSafetyChecks' => self::BOTH_CHECKS ]
+		)->screen( $this->png_path, 'image/png' );
+
+		$this->assertTrue( $result->rejected );
+		$this->assertSame( UploadScreener::MSG_REJECTED, $result->message_key );
+		$this->assertSame( [ 'nsfw', 'nudity_regions' ], array_keys( $result->rejecting_checks() ) );
+		$this->assertSame( [], $result->suspect_checks() );
+		$this->assertStringContainsString( 'frames=1/1/1 suspects=2', $result->debug_summary() );
+		$this->assertTrue( $result->cacheable() );
+	}
+
+	public function test_one_check_over_its_threshold_rejects_alone(): void {
+		$result = $this->new_screener(
+			self::response( [ 'nsfw' => self::nsfw( 0.0 ), 'nudity_regions' => self::regions( 0.31 ) ] ),
+			[ 'UploadSafetyChecks' => self::BOTH_CHECKS ]
+		)->screen( $this->png_path, 'image/png' );
+
+		$this->assertTrue( $result->rejected );
+		$this->assertSame( [ 'nudity_regions' ], array_keys( $result->rejecting_checks() ) );
+	}
+
+	public function test_one_doubtful_check_rejects_when_configured(): void {
+		$result = $this->new_screener(
+			self::response( [ 'nsfw' => self::nsfw( 0.6 ), 'nudity_regions' => self::regions() ] ),
+			[ 'UploadSafetyChecks' => self::BOTH_CHECKS, 'UploadSafetySuspectsToReject' => 1 ]
+		)->screen( $this->png_path, 'image/png' );
+
+		$this->assertTrue( $result->rejected );
+		$this->assertSame( [ 'nsfw' ], array_keys( $result->rejecting_checks() ) );
+	}
+
+	public function test_doubtful_check_with_an_unavailable_one_follows_fail_policy(): void {
+		$response = self::response( [ 'nsfw' => self::nsfw( 0.6 ), 'nudity_regions' => [ 'status' => 'unsupported' ] ] );
+
+		$closed = $this->new_screener( $response, [ 'UploadSafetyChecks' => self::BOTH_CHECKS ] )->screen( $this->png_path, 'image/png' );
+		$this->assertTrue( $closed->rejected );
+		$this->assertSame( UploadScreener::MSG_UNAVAILABLE, $closed->message_key );
+		$this->assertSame( [], $closed->rejecting_checks(), 'rejected because a check was unavailable, not by the checks' );
+
+		$open = $this->new_screener( $response, [ 'UploadSafetyChecks' => self::BOTH_CHECKS, 'UploadSafetyFailClosed' => false ] )
+			->screen( $this->png_path, 'image/png' );
+		$this->assertFalse( $open->rejected );
+		$this->assertSame( [ 'nsfw' ], array_keys( $open->suspect_checks() ) );
 	}
 
 	public function test_reject_wins_over_unavailable(): void {

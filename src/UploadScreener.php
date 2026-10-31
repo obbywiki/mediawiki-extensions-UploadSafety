@@ -12,7 +12,9 @@ use Psr\Log\LoggerInterface;
 
 /**
  * Sends an upload to the sidecar once for every check in $wgUploadSafetyChecks, then evaluates each signal.
- * Any rejecting check rejects the upload. An unavailable check rejects it only when UploadSafetyFailClosed is on.
+ * Any rejecting check rejects the upload, and so do $wgUploadSafetySuspectsToReject checks that are doubtful (suspect) at once,
+ * so a check that misfires on its own (e.g. a classifier on skin-coloured palettes) does not reject harmless images.
+ * An unavailable check rejects it only when UploadSafetyFailClosed is on.
  */
 class UploadScreener {
 
@@ -23,6 +25,7 @@ class UploadScreener {
 		'UploadSafetyChecks',
 		'UploadSafetyAutoScreen',
 		'UploadSafetyMaxFrames',
+		'UploadSafetySuspectsToReject',
 	];
 
 	public const MSG_REJECTED = 'uploadsafety-upload-rejected';
@@ -78,6 +81,13 @@ class UploadScreener {
 		}
 
 		return [ $result->message_key ];
+	}
+
+	/**
+	 * How many checks have to be doubtful at once to reject an upload.
+	 */
+	public function suspects_to_reject(): int {
+		return max( 1, (int)$this->options->get( 'UploadSafetySuspectsToReject' ) );
 	}
 
 	public function max_frames(): int {
@@ -163,6 +173,11 @@ class UploadScreener {
 			if ( $result->verdict === CheckVerdict::Reject ) {
 				return new ScreeningResult( true, self::MSG_REJECTED, $results, $detail );
 			}
+		}
+
+		$suspects = count( array_filter( $results, static fn ( CheckResult $result ) => $result->verdict === CheckVerdict::Suspect ) );
+		if ( $suspects >= $this->suspects_to_reject() ) {
+			return new ScreeningResult( true, self::MSG_REJECTED, $results, trim( $detail . ' suspects=' . $suspects ) );
 		}
 
 		foreach ( $results as $result ) {

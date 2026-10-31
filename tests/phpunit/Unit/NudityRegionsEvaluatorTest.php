@@ -35,6 +35,16 @@ class NudityRegionsEvaluatorTest extends MediaWikiUnitTestCase {
 			[ 'thresholds' => [ 'breast_covered' => 0.5 ] ],
 			CheckVerdict::Pass,
 		];
+		yield 'doubtful region' => [ [ 'regions' => [ self::region( 'breast_exposed', 0.25 ) ] ], [ 'suspect' => 0.2 ], CheckVerdict::Suspect ];
+		yield 'region under suspect' => [ [ 'regions' => [ self::region( 'breast_exposed', 0.19 ) ] ], [ 'suspect' => 0.2 ], CheckVerdict::Pass ];
+		yield 'doubtful region of an ignored label' => [ [ 'regions' => [ self::region( 'breast_covered', 0.9 ) ] ], [ 'suspect' => 0.2 ], CheckVerdict::Pass ];
+		yield 'rejecting region wins over a doubtful one' => [
+			[ 'regions' => [ self::region( 'breast_exposed', 0.25 ), self::region( 'anus_exposed', 0.5 ) ] ],
+			[ 'suspect' => 0.2 ],
+			CheckVerdict::Reject,
+		];
+		yield 'suspect below the sidecar min_score' => [ [ 'min_score' => 0.2, 'regions' => [] ], [ 'suspect' => 0.1 ], CheckVerdict::Unavailable ];
+		yield 'invalid suspect' => [ [ 'regions' => [] ], [ 'suspect' => 'low' ], CheckVerdict::Unavailable ];
 		yield 'regions missing' => [ [], [], CheckVerdict::Unavailable ];
 		yield 'regions not a list' => [ [ 'regions' => [ 'a' => self::region( 'breast_exposed', 0.9 ) ] ], [], CheckVerdict::Unavailable ];
 		yield 'region without label' => [ [ 'regions' => [ [ 'score' => 0.9 ] ] ], [], CheckVerdict::Unavailable ];

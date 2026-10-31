@@ -63,8 +63,34 @@ class RejectionLogTest extends MediaWikiIntegrationTestCase {
 		$this->assertFalse( $params['repeat'] );
 
 		$text = $this->render( $entry );
-		$this->assertStringContainsString( 'nsfw check', $text );
+		$this->assertStringContainsString( 'rejected by nsfw (score 0.93', $text );
 		$this->assertStringContainsString( str_repeat( 'a', 40 ), $text );
+	}
+
+	public function test_reject_entry_lists_doubtful_checks_that_rejected_together(): void {
+		$result = new ScreeningResult( true, 'uploadsafety-upload-rejected', [
+			'nsfw' => new CheckResult( CheckVerdict::Suspect, 'nsfw', 0.6 ),
+			'nudity_regions' => new CheckResult( CheckVerdict::Suspect, 'breast_exposed', 0.25 ),
+		], 'frames=1/1/1 suspects=2' );
+
+		( new RejectionLog() )->reject( $this->getTestUser()->getUser(), PageReferenceValue::localReference( NS_FILE, 'Bad.png' ), 'upload', $result, str_repeat( 'a', 40 ), false );
+
+		$params = $this->last_entry( 'reject' )->getParameters();
+		$this->assertSame( 'nsfw, nudity_regions', $params['5::check'] );
+		$this->assertSame( '0.6, 0.25', $params['6::score'] );
+	}
+
+	public function test_suspect_entry(): void {
+		$result = new ScreeningResult( false, '', [
+			'nsfw' => new CheckResult( CheckVerdict::Suspect, 'nsfw', 0.7328 ),
+			'nudity_regions' => new CheckResult( CheckVerdict::Pass ),
+		] );
+
+		( new RejectionLog() )->suspect( $this->getTestUser()->getUser(), PageReferenceValue::localReference( NS_FILE, 'Maybe.png' ), 'avatar', $result, str_repeat( 'b', 40 ), false );
+
+		$entry = $this->last_entry( 'suspect' );
+		$this->assertSame( 'nsfw', $entry->getParameters()['5::check'] );
+		$this->assertStringContainsString( 'allowed, but found doubtful by nsfw (score 0.7328, surface avatar', $this->render( $entry ) );
 	}
 
 	public function test_limited_entry(): void {

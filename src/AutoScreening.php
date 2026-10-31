@@ -10,7 +10,7 @@ use MediaWiki\User\User;
 use Wikimedia\ObjectCache\WANObjectCache;
 
 /**
- * Automatic screening (core uploads, IntegratedProfiles images): UploadScreener plus the side effects a wiki wants when it screens on its own, i.e. rate limits, a verdict cache and the rejection log.
+ * Automatic screening (core uploads, IntegratedProfiles images): UploadScreener plus the side effects a wiki wants when it screens on its own, i.e. rate limits, a verdict cache and the log (rejections, and allowed uploads that some check found doubtful).
  * Other callers (e.g. a moderation queue) can use UploadScreener directly and decide those for themselves instead.
  */
 class AutoScreening {
@@ -83,9 +83,11 @@ class AutoScreening {
 		if ( $cached !== null ) {
 			$result = $cached->with_detail( trim( 'cached=1 ' . $cached->detail ) );
 			$this->screener->log_result( $result, $file_path, $mime, $filename, $surface );
-			if ( $result->rejecting_check() !== null ) {
+			if ( $result->rejecting_checks() !== [] ) {
 				// the same file again teaches the uploader nothing, so it is logged but not counted
 				$this->log->reject( $performer, $target ?? $user_page, $surface, $result, (string)$sha1, true );
+			} elseif ( $result->suspect_checks() !== [] ) {
+				$this->log->suspect( $performer, $target ?? $user_page, $surface, $result, (string)$sha1, true );
 			}
 
 			return $result;
@@ -101,9 +103,11 @@ class AutoScreening {
 			$this->cache->set( $cache_key, $result->to_array(), self::VERDICT_TTL );
 		}
 
-		if ( $result->rejecting_check() !== null && is_string( $sha1 ) ) {
+		if ( $result->rejecting_checks() !== [] && is_string( $sha1 ) ) {
 			$this->log->reject( $performer, $target ?? $user_page, $surface, $result, $sha1, false );
 			$this->count_rejection( $performer, $user_page, $surface );
+		} elseif ( $result->suspect_checks() !== [] && is_string( $sha1 ) ) {
+			$this->log->suspect( $performer, $target ?? $user_page, $surface, $result, $sha1, false );
 		}
 
 		return $result;
@@ -124,7 +128,7 @@ class AutoScreening {
 
 	private function cache_key( string $sha1 ): string {
 		// verdicts depend on the checks and their parameters, so changing them invalidates the cache
-		$fingerprint = md5( json_encode( [ $this->screener->enabled_checks(), $this->screener->max_frames() ] ) );
+		$fingerprint = md5( json_encode( [ $this->screener->enabled_checks(), $this->screener->max_frames(), $this->screener->suspects_to_reject() ] ) );
 
 		return $this->cache->makeKey( 'uploadsafety', 'verdict', $sha1, $fingerprint );
 	}
