@@ -7,3 +7,11 @@ coverage/**
 vendor/**
 composer.lock
 .phpunit.result.cache
+
+# which models the sidecar runs stays private (see sidecar/README.md)
+sidecar/models*.json
+
+# evals/results leak the model names
+sidecar/eval/corpus/
+sidecar/eval/results/
+__pycache__/
