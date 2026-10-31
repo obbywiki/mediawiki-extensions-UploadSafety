@@ -27,6 +27,9 @@ As for everything else, see: <https://github.com/obbywiki/standards>
 - `src/AutoScreening.php` is automatic screening: rate limits, the verdict cache and `src/RejectionLog.php` around the screener. The screener itself stays free of side effects so other callers (e.g. a moderation queue) can use it on their own terms.
 - `src/Hooks.php` wires automatic screening into core's upload hooks, and `src/IntegratedProfilesHooks.php` into IntegratedProfiles avatar and banner uploads. The latter is a separate handler so the IntegratedProfiles interface is only loaded when that extension runs the hook. `src/UnscreenedFormats.php` decides who may upload formats the checks cannot screen; `src/UnscreenedUploadHooks.php` applies it to core uploads, and the IntegratedProfiles handler to avatars and banners.
 
+- `sidecar/` is the reference sidecar (FastAPI and ONNX Runtime, `serve.py`), its Dockerfile, and `export/export.py`, which converts models to ONNX at build time. See `sidecar/README.md`.
+- `sidecar/eval/evaluate.py` scores a labelled corpus against a running sidecar (see below).
+
 Adding a check means defining its signal in `docs/sidecar-api.md`, implementing it in the sidecar, then adding an evaluator here.
 
 # Tests
@@ -54,3 +57,16 @@ For PHP lint inside the container (`composer test` on the host works too):
 ```sh
 mwenv run -- sh -c 'composer install && composer test'
 ```
+
+## Sidecar evaluation
+
+Before changing over anything (like a model, runtime, or threshold), you can score a corpus with the current sidecar against the changed one and then compare both of them. Use the widest corpus for the best results, like real images from your wiki. The script only needs Python 3 (no packages).
+
+```sh
+# files in sidecar/eval/corpus/allow/... must pass, while files in sidecar/eval/corpus/reject/... must be rejected
+python3 sidecar/eval/evaluate.py run sidecar/eval/corpus --out sidecar/eval/results/baseline.json
+python3 sidecar/eval/evaluate.py run sidecar/eval/corpus --url http://127.0.0.1:8091 --out sidecar/eval/results/candidate.json
+python3 sidecar/eval/evaluate.py compare sidecar/eval/results/baseline.json sidecar/eval/results/candidate.json
+```
+
+`run` prints false rejects and misses for each threshold. `compare` matches files by hash and exits non-zero when a verdict flips at `--threshold`. The corpus and results are gitignored intentionally, as the corpus may contain material that must not be committed, and results name the models.
