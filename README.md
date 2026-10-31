@@ -8,8 +8,6 @@ Models run in a separate sidecar service that implements the [sidecar API](docs/
 
 With this, animated images are checked frame by frame (which is expensive), so you may want to 
 
-Currently implemented checks: `nsfw` (designed for `Falconsai/nsfw_image_detection`).
-
 ## Screening
 
 UploadSafety screens automatically by default:
@@ -65,7 +63,7 @@ Calling the `UploadSafety.UploadScreener` service directly (e.g. from a moderati
 | `$wgUploadSafetySidecarUrl` | `http://nsfw_detector:8000` | Sidecar base URL. |
 | `$wgUploadSafetySidecarApiKey` | `''` | Optional Bearer token for the sidecar. |
 | `$wgUploadSafetyAutoScreen` | `[ 'upload' => true, 'avatar' => true, 'banner' => true ]` | Surfaces screened automatically. `upload` is core file uploads, `avatar` and `banner` are [IntegratedProfiles](https://github.com/obbywiki/mediawiki-extensions-IntegratedProfiles) images. Surfaces not listed are screened. |
-| `$wgUploadSafetyChecks` | `[ 'nsfw' => [ 'threshold' => 0.5 ] ]` | Checks to run, as name => parameters. Setting it replaces the default entirely. |
+| `$wgUploadSafetyChecks` | `[ 'nsfw' => [ 'threshold' => 0.5 ], 'nudity_regions' => [ 'thresholds' => [ 'genitalia_exposed' => 0.3, 'breast_exposed' => 0.3, 'buttocks_exposed' => 0.3, 'anus_exposed' => 0.3 ] ] ]` | Checks to run, as name => parameters. Setting it replaces the default entirely. A check the sidecar does not support is unavailable, which rejects every upload while `$wgUploadSafetyFailClosed` is on. |
 | `$wgUploadSafetyMaxFrames` | `64` | Frames of an animated image to analyse (sampled evenly beyond this). |
 | `$wgUploadSafetyTimeout` | `30` | Sidecar timeout in seconds. |
 | `$wgUploadSafetyFailClosed` | `true` | Reject when the sidecar or a check is unavailable. |

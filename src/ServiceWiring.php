@@ -3,6 +3,7 @@
 use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Extension\UploadSafety\AutoScreening;
 use MediaWiki\Extension\UploadSafety\Check\NsfwEvaluator;
+use MediaWiki\Extension\UploadSafety\Check\NudityRegionsEvaluator;
 use MediaWiki\Extension\UploadSafety\RejectionLog;
 use MediaWiki\Extension\UploadSafety\Sidecar\SidecarClient;
 use MediaWiki\Extension\UploadSafety\Sidecar\SidecarInfo;
@@ -39,6 +40,7 @@ return [
 			$services->get( 'UploadSafety.SidecarClient' ),
 			[
 				new NsfwEvaluator(),
+				new NudityRegionsEvaluator(),
 			],
 			LoggerFactory::getInstance( 'UploadSafety' )
 		);

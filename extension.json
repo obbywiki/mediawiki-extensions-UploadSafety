@@ -130,10 +130,18 @@
 			"value": {
 				"nsfw": {
 					"threshold": 0.5
+				},
+				"nudity_regions": {
+					"thresholds": {
+						"genitalia_exposed": 0.3,
+						"breast_exposed": 0.3,
+						"buttocks_exposed": 0.3,
+						"anus_exposed": 0.3
+					}
 				}
 			},
 			"merge_strategy": "provide_default",
-			"description": "Checks to run, as name => parameters. Setting this replaces the default entirely. nsfw: reject when the score is >= threshold."
+			"description": "Checks to run, as name => parameters. Setting this replaces the default entirely. nsfw: reject when the score is >= threshold. nudity_regions: reject when a region's score is >= the threshold for its label (labels left out of thresholds are ignored)."
 		},
 		"UploadSafetyMaxFrames": {
 			"value": 64,
