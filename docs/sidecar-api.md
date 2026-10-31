@@ -67,7 +67,7 @@ Still images are a single frame.
       "status": "ok",
       "score": 0.93,
       "frame": 7,
-      "model": "Falconsai/nsfw_image_detection",
+      "model": "example-org/nsfw-classifier",
       "labels": [ { "label": "nsfw", "score": 0.93 }, { "label": "normal", "score": 0.07 } ]
     },
     "ocr": {
@@ -113,13 +113,13 @@ Describes the sidecar. UploadSafety caches it briefly and shows the service vers
 
 ```json
 {
-  "service": { "name": "upload-safety-sidecar", "version": "0.2.0", "url": "https://github.com/obbywiki/mediawiki-extensions-UploadSafety" },
+  "service": { "name": "upload-safety-sidecar", "version": "0.3.0", "url": "https://github.com/obbywiki/mediawiki-extensions-UploadSafety" },
   "runtime": [
     { "name": "Python", "version": "3.12.7", "url": "https://www.python.org/" },
-    { "name": "PyTorch", "version": "2.5.1", "url": "https://pytorch.org/" }
+    { "name": "ONNX Runtime", "version": "1.31.1", "url": "https://onnxruntime.ai/" }
   ],
   "checks": {
-    "nsfw": { "model": "Falconsai/nsfw_image_detection", "revision": "abc123" }
+    "nsfw": { "model": "example-org/nsfw-classifier", "revision": "abc123" }
   },
   "limits": { "max_bytes": 10485760, "max_frames": 64, "max_decode_frames": 1000, "max_pixels": 50000000 }
 }
@@ -148,10 +148,36 @@ Whole-image sexual-content classifier.
 
 Extension config: `$wgUploadSafetyChecks['nsfw'] = [ 'threshold' => 0.5 ]` rejects when `score >= threshold`.
 
+### `nudity_regions` (stable)
+
+Object detector for exposed or covered body parts. Unlike a whole-image classifier, it needs to find an actual region, so it is far less prone to firing on skin-coloured palettes, and it catches small regions in otherwise harmless images.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `regions` | list | For each label, the highest-scoring region over all analysed frames, highest score first. Labels with no region at or above `min_score` are left out. |
+| `regions[].label` | string | One of the labels below. Clients must ignore labels they do not know. |
+| `regions[].score` | number, 0 to 1 | Detection confidence. Not a probability that the image is sexual: calibrate thresholds separately from `nsfw`. |
+| `regions[].frame` | integer | Index (in the original frame sequence) of the frame the region is in. |
+| `regions[].box` | `[x, y, width, height]` | Region in source pixels. |
+| `min_score` | number, optional | Regions below this score are never reported, so thresholds below it cannot be honoured. |
+| `model` | string, optional | Model identifier. |
+
+Labels: `genitalia_exposed`, `breast_exposed`, `buttocks_exposed`, `anus_exposed`, and the same with `_covered`. Sidecars map their model's own labels to these, so the model can change without touching wiki configuration.
+
+```json
+"nudity_regions": {
+  "status": "ok",
+  "min_score": 0.2,
+  "regions": [ { "label": "breast_exposed", "score": 0.81, "frame": 3, "box": [ 120, 64, 90, 85 ] } ],
+  "model": "example-org/nudity-detector"
+}
+```
+
+Extension config: `$wgUploadSafetyChecks['nudity_regions'] = [ 'thresholds' => [ 'genitalia_exposed' => 0.3, ... ] ]` rejects when any region's score is at or above the threshold for its label. Labels left out of `thresholds` are ignored; the default covers the four `_exposed` labels at 0.3. A threshold below the sidecar's `min_score` makes the check unavailable.
+
 ### Draft checks
 
 Reserved names. Shapes may still change until they are implemented on both sides.
 
-- **`nudity_regions`**: object detector for small regions a whole-image classifier misses. `regions`: list of `{ label, score, frame, box: [x, y, width, height] }` in source pixels.
 - **`ocr`**: text in the image. `text` (all lines joined by `\n`), `lines`: list of `{ text, score, frame, box }`.
 - **`qr`**: decoded QR and barcodes. `codes`: list of `{ format, text, frame, box }`.
