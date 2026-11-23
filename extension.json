@@ -1,7 +1,7 @@
 {
 	"manifest_version": 2,
 	"name": "UploadSafety",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"author": [
 		"[https://wolfite.dev Wolfite]",
 		"[https://obby.wiki The Obby Wiki]"
@@ -54,16 +54,34 @@
 	},
 	"RateLimits": {
 		"uploadsafety-screen": {
-			"newbie": [ 100, 3600 ],
-			"user": [ 100, 3600 ]
+			"newbie": [
+				100,
+				3600
+			],
+			"user": [
+				100,
+				3600
+			]
 		},
 		"uploadsafety-reject": {
-			"newbie": [ 6, 900 ],
-			"user": [ 12, 900 ]
+			"newbie": [
+				6,
+				900
+			],
+			"user": [
+				12,
+				900
+			]
 		},
 		"uploadsafety-reject-daily": {
-			"newbie": [ 15, 86400 ],
-			"user": [ 30, 86400 ]
+			"newbie": [
+				15,
+				86400
+			],
+			"user": [
+				30,
+				86400
+			]
 		}
 	},
 	"HookHandlers": {
