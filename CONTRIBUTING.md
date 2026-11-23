@@ -69,4 +69,4 @@ python3 sidecar/eval/evaluate.py run sidecar/eval/corpus --url http://127.0.0.1:
 python3 sidecar/eval/evaluate.py compare sidecar/eval/results/baseline.json sidecar/eval/results/candidate.json
 ```
 
-`run` prints false rejects and misses for each threshold. `compare` matches files by hash and exits non-zero when a verdict flips at `--threshold`. The corpus and results are gitignored intentionally, as the corpus may contain material that must not be committed, and results name the models.
+Checks that only run on some surfaces get their own corpus with the same layout, e.g. `sidecar/eval/corpus-faces` (with `--checks faces`) for photos of people that avatars must reject. `run` prints false rejects and misses for each threshold. `compare` matches files by hash and exits non-zero when a verdict flips at `--threshold`. The corpus and results are gitignored intentionally, as the corpus may contain material that must not be committed, and results name the models.

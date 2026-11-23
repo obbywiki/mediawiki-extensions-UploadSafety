@@ -24,6 +24,10 @@ Detectors are Ultralytics YOLOv8 ONNX exports, downloaded from a URL and pinned 
       "labels": { "<model label>": "<contract label>", ... }   # model labels left out are ignored
     }
 
+Face detectors are OpenCV YuNet ONNX files (fixed square input, cls/obj/bbox/kps outputs at strides 8, 16 and 32), downloaded the same way:
+
+    "faces": { "loader": "yunet", "url": "https://.../face_detection_yunet_2023mar.onnx", "sha256": "<hash>", "model": "<name>", "revision": "<tag or commit>" }
+
 Only config files, model.safetensors and ONNX files are downloaded. Pickle-based weights (.bin, .pt) are never fetched, and no repository code is run.
 OUT_DIR receives <check>.onnx for every check, plus manifest.json describing labels and preprocessing for serve.py.
 """
@@ -138,14 +142,12 @@ def load_timm(spec: dict[str, Any]) -> tuple[torch.nn.Module, list[str], dict[st
 LOADERS = {"transformers": load_transformers, "timm": load_timm}
 
 
-def export_detector(check: str, spec: dict[str, Any], out_dir: Path) -> dict[str, Any]:
+def download_onnx(check: str, spec: dict[str, Any], out_dir: Path) -> tuple[Path, str]:
+    """Downloads a ready-made ONNX file from spec["url"] to OUT_DIR/<check>.onnx, refusing it unless it matches spec["sha256"]."""
     if not re.fullmatch(r"[0-9a-f]{64}", str(spec.get("sha256", "")).lower()):
         raise SystemExit(f"{check}: sha256 of the ONNX file is required")
     if not spec.get("model") or not spec.get("url", "").startswith("https://"):
         raise SystemExit(f"{check}: model and an https url are required")
-    unknown = set(spec.get("labels", {}).values()) - REGION_LABELS
-    if not spec.get("labels") or unknown:
-        raise SystemExit(f"{check}: labels must map model labels to {sorted(REGION_LABELS)}, not {sorted(unknown)}")
 
     print(f"[export] {check}: downloading", flush=True)
     # GitHub release assets need the API URL (api.github.com/repos/<owner>/<repo>/releases/assets/<id>) and this Accept header
@@ -158,7 +160,48 @@ def export_detector(check: str, spec: dict[str, Any], out_dir: Path) -> dict[str
         raise SystemExit(f"{check}: sha256 {actual}, expected {spec['sha256']} ({len(data)} bytes downloaded)")
     path = out_dir / f"{check}.onnx"
     path.write_bytes(data)
+    return path, actual
 
+
+YUNET_OUTPUTS = [f"{kind}_{stride}" for kind in ("cls", "obj", "bbox", "kps") for stride in (8, 16, 32)]
+
+
+def export_yunet(check: str, spec: dict[str, Any], out_dir: Path) -> dict[str, Any]:
+    path, sha256 = download_onnx(check, spec, out_dir)
+    session = onnxruntime.InferenceSession(str(path), providers=["CPUExecutionProvider"])
+    inputs = session.get_inputs()
+    if len(inputs) != 1 or len(inputs[0].shape) != 4 or not all(isinstance(dim, int) for dim in inputs[0].shape[2:]):
+        raise SystemExit(f"{check}: expected one fixed-size image input, got {[(i.name, i.shape) for i in inputs]}")
+    _, _, height, width = inputs[0].shape
+    if height != width or height % 32:
+        raise SystemExit(f"{check}: input must be square and a multiple of 32, not {width}x{height}")
+    if sorted(output.name for output in session.get_outputs()) != sorted(YUNET_OUTPUTS):
+        raise SystemExit(f"{check}: not a YuNet model (outputs {[output.name for output in session.get_outputs()]})")
+
+    outputs = session.run(YUNET_OUTPUTS, {inputs[0].name: np.zeros((1, 3, height, width), dtype=np.float32)})
+    for name, output in zip(YUNET_OUTPUTS, outputs):
+        stride = int(name.split("_")[1])
+        if output.shape[1] != (height // stride) * (width // stride):
+            raise SystemExit(f"{check}: {name} has shape {output.shape}")
+    print(f"[export] {check}: {width}px input", flush=True)
+
+    return {
+        "kind": "faces",
+        "file": path.name,
+        "sha256": sha256,
+        "model": spec["model"],
+        "revision": spec.get("revision", ""),
+        "input": inputs[0].name,
+        "size": height,
+    }
+
+
+def export_detector(check: str, spec: dict[str, Any], out_dir: Path) -> dict[str, Any]:
+    unknown = set(spec.get("labels", {}).values()) - REGION_LABELS
+    if not spec.get("labels") or unknown:
+        raise SystemExit(f"{check}: labels must map model labels to {sorted(REGION_LABELS)}, not {sorted(unknown)}")
+
+    path, actual = download_onnx(check, spec, out_dir)
     session = onnxruntime.InferenceSession(str(path), providers=["CPUExecutionProvider"])
     metadata = session.get_modelmeta().custom_metadata_map
     if metadata.get("task") != "detect":
@@ -191,13 +234,15 @@ def export_detector(check: str, spec: dict[str, Any], out_dir: Path) -> dict[str
 def export(check: str, spec: dict[str, Any], out_dir: Path) -> dict[str, Any]:
     if spec.get("loader") == "yolov8":
         return export_detector(check, spec, out_dir)
+    if spec.get("loader") == "yunet":
+        return export_yunet(check, spec, out_dir)
     if not re.fullmatch(r"[0-9a-f]{40}", spec.get("revision", "")):
         raise SystemExit(f"{check}: revision must be a full commit hash")
     if WEIGHTS not in spec.get("sha256", {}):
         raise SystemExit(f"{check}: sha256 of {WEIGHTS} is required")
     loader = LOADERS.get(spec.get("loader", ""))
     if loader is None:
-        raise SystemExit(f"{check}: loader must be one of {sorted([*LOADERS, 'yolov8'])}")
+        raise SystemExit(f"{check}: loader must be one of {sorted([*LOADERS, 'yolov8', 'yunet'])}")
 
     print(f"[export] {check}: loading", flush=True)
     model, labels, preprocess = loader(spec)

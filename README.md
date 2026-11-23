@@ -25,16 +25,21 @@ Each check scores an image, and has two levels: a **threshold**, at or above whi
 
 This keeps one check's misfires from rejecting harmless images on their own: the whole-image `nsfw` classifier can score pale or skin-coloured artwork highly, and the `nudity_regions` detector occasionally sees body parts in animals, but they rarely agree on a harmless image. By default, `nsfw` rejects alone only from 0.98 and is doubtful from 0.5; `nudity_regions` rejects alone from 0.3 for exposed body parts and is doubtful from 0.2. If you'd rather reject anything doubtful, set `$wgUploadSafetySuspectsToReject = 1`.
 
-Surfaces can have their own settings in `$wgUploadSafetySurfaces`. For example, to reject anything doubtful on avatars and banners, which are shown everywhere and rarely need to be borderline, while keeping regular uploads as they are:
+### Surfaces and faces
+
+Surfaces can have their own settings in `$wgUploadSafetySurfaces`. A surface's `checks` are added to `$wgUploadSafetyChecks` (a check listed in both takes the surface's parameters, and `false` turns one off), and `suspects_to_reject` replaces `$wgUploadSafetySuspectsToReject`.
+
+By default, avatars and banners also run the `faces` check, which rejects photos of real people: on wikis with many young users, a selfie as a profile picture gives away who someone is. It counts faces covering at least 5% of the image (`min_area`), so a crowd in the background of a banner is fine, rejects from a score of 0.7 and is doubtful from 0.6. The face detector is trained on photos and rarely fires on drawings or game characters, but animals' faces can land in the doubtful range. Uploaders get a message explaining that photos of people can't be used, instead of the generic rejection. Regular uploads don't run it, since an article image may well show a person.
+
+Setting `$wgUploadSafetySurfaces` replaces the default entirely, so keep the `faces` entries when adding your own. For example, to also reject anything doubtful on avatars and banners, which are shown everywhere and rarely need to be borderline:
 
 ```php
+$faces = [ 'threshold' => 0.7, 'suspect' => 0.6, 'min_area' => 0.05 ];
 $wgUploadSafetySurfaces = [
-	'avatar' => [ 'suspects_to_reject' => 1 ],
-	'banner' => [ 'suspects_to_reject' => 1 ],
+	'avatar' => [ 'checks' => [ 'faces' => $faces ], 'suspects_to_reject' => 1 ],
+	'banner' => [ 'checks' => [ 'faces' => $faces ], 'suspects_to_reject' => 1 ],
 ];
 ```
-
-A surface's `checks` replaces `$wgUploadSafetyChecks` entirely for it, like setting `$wgUploadSafetyChecks` itself replaces the default.
 
 Other extensions (e.g. a moderation queue) can screen on their own terms through the `UploadSafety.UploadScreener` service, and turn off automatic screening for a surface with `$wgUploadSafetyAutoScreen`.
 
@@ -82,7 +87,7 @@ Calling the `UploadSafety.UploadScreener` service directly (e.g. from a moderati
 | `$wgUploadSafetyAutoScreen` | `[ 'upload' => true, 'avatar' => true, 'banner' => true ]` | Surfaces screened automatically. `upload` is core file uploads, `avatar` and `banner` are [IntegratedProfiles](https://github.com/obbywiki/mediawiki-extensions-IntegratedProfiles) images. Surfaces not listed are screened. |
 | `$wgUploadSafetyChecks` | `[ 'nsfw' => [ 'threshold' => 0.98, 'suspect' => 0.5 ], 'nudity_regions' => [ 'thresholds' => [ 'genitalia_exposed' => 0.3, 'breast_exposed' => 0.3, 'buttocks_exposed' => 0.3, 'anus_exposed' => 0.3 ], 'suspect' => 0.2 ] ]` | Checks to run, as name => parameters (see [How checks combine](#how-checks-combine)). Setting it replaces the default entirely. A check the sidecar does not support is unavailable, which rejects every upload while `$wgUploadSafetyFailClosed` is on. |
 | `$wgUploadSafetySuspectsToReject` | `2` | How many checks have to find an upload doubtful at once to reject it. `1` rejects on any doubtful check. |
-| `$wgUploadSafetySurfaces` | `[]` | Per-surface overrides, as surface => `[ 'checks' => ..., 'suspects_to_reject' => ... ]`. Keys left out use the global setting. |
+| `$wgUploadSafetySurfaces` | `faces` on `avatar` and `banner` | Per-surface settings, as surface => `[ 'checks' => ..., 'suspects_to_reject' => ... ]` (see [Surfaces and faces](#surfaces-and-faces)). Setting it replaces the default entirely. |
 | `$wgUploadSafetyMaxFrames` | `64` | Frames of an animated image to analyse (sampled evenly beyond this). |
 | `$wgUploadSafetyTimeout` | `30` | Sidecar timeout in seconds. |
 | `$wgUploadSafetyFailClosed` | `true` | Reject when the sidecar or a check is unavailable. |

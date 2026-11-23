@@ -175,6 +175,31 @@ Labels: `genitalia_exposed`, `breast_exposed`, `buttocks_exposed`, `anus_exposed
 
 Extension config: `$wgUploadSafetyChecks['nudity_regions'] = [ 'thresholds' => [ 'genitalia_exposed' => 0.3, ... ] ]` rejects when any region's score is at or above the threshold for its label. Labels left out of `thresholds` are ignored; the default covers the four `_exposed` labels at 0.3. A threshold below the sidecar's `min_score` makes the check unavailable.
 
+### `faces` (stable)
+
+Face detector, for keeping photos of real people off profile images. Detectors trained on photos rarely fire on drawings or game characters.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `faces` | list | Faces at or above `min_score` over all analysed frames, highest score first, possibly capped by the sidecar. |
+| `faces[].score` | number, 0 to 1 | Detection confidence. |
+| `faces[].frame` | integer | Index (in the original frame sequence) of the frame the face is in. |
+| `faces[].box` | `[x, y, width, height]` | Face in source pixels, clipped to the frame. |
+| `faces[].area` | number, 0 to 1 | Share of the frame the box covers. A selfie fills much of it, a face in a crowd does not. |
+| `min_score` | number, optional | Faces below this score are never reported, so thresholds below it cannot be honoured. |
+| `model` | string, optional | Model identifier. |
+
+```json
+"faces": {
+  "status": "ok",
+  "min_score": 0.5,
+  "faces": [ { "score": 0.94, "frame": 0, "box": [ 130, 60, 210, 270 ], "area": 0.22 } ],
+  "model": "example-org/face-detector"
+}
+```
+
+Extension config: `[ 'threshold' => 0.7, 'suspect' => 0.6, 'min_area' => 0.05 ]` rejects when a face covering at least `min_area` scores at or above `threshold`. By default it only runs on avatars and banners (`$wgUploadSafetySurfaces`).
+
 ### Draft checks
 
 Reserved names. Shapes may still change until they are implemented on both sides.

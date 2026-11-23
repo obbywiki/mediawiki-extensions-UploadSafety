@@ -46,6 +46,8 @@ Detectors (`nudity_regions`) are Ultralytics YOLOv8 ONNX exports, downloaded as-
 | `model`, `revision` | Shown in `/v1/info` and check responses. |
 | `labels` | Model label → contract label (see the [contract](../docs/sidecar-api.md#nudity_regions-stable)). Model labels left out are ignored. |
 
+Face detectors (`faces`) are OpenCV YuNet ONNX files, downloaded the same way with `"loader": "yunet"` (`url`, `sha256`, `model` and `revision` as above, no `labels`). Frames are scaled to fit the model input and padded at the bottom right, and decoding follows OpenCV's `FaceDetectorYN`. The sidecar reports up to `MAX_FACES` faces down to `MIN_FACE_SCORE`, each with the share of the frame it covers.
+
 Labels and input size are read from the ONNX file's metadata. Images are padded to a square at the bottom right and resized to the model input, and for each label the sidecar reports its strongest region across all frames, down to `MIN_REGION_SCORE`.
 
 When picking a model, check the publisher and the repository's commit history. Don't pin weights that changed in the last few days: a compromised upload needs time to be noticed.
@@ -71,6 +73,8 @@ The build verifies each ONNX model against the original on a test batch and fail
 | `MAX_DECODE_FRAMES` | 1000 | Animations with more frames are refused (`422 too_many_frames`). |
 | `MAX_TILES` | 4 | Tiles per frame for crop-trained models. |
 | `MIN_REGION_SCORE` | 0.2 | Weakest detector region reported (`min_score` in the response). |
+| `MIN_FACE_SCORE` | 0.5 | Weakest face reported (`min_score` in the response). |
+| `MAX_FACES` | 10 | Most faces reported per image. |
 | `BATCH_SIZE` | 8 | Images per inference call. Peak memory grows with it. |
 | `THREADS` | 0 (automatic) | ONNX Runtime threads per inference. |
 | `PREPACK` | 0 | `1` keeps a second, reordered copy of the weights: a few percent faster, but close to twice the memory. |

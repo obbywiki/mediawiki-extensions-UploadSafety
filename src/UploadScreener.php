@@ -6,6 +6,7 @@ use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Extension\UploadSafety\Check\CheckEvaluator;
 use MediaWiki\Extension\UploadSafety\Check\CheckResult;
 use MediaWiki\Extension\UploadSafety\Check\CheckVerdict;
+use MediaWiki\Extension\UploadSafety\Check\RejectionMessage;
 use MediaWiki\Extension\UploadSafety\Sidecar\SidecarClient;
 use MediaWiki\Extension\UploadSafety\Sidecar\SidecarUnavailableException;
 use Psr\Log\LoggerInterface;
@@ -119,27 +120,56 @@ class UploadScreener {
 	}
 
 	/**
-	 * Enabled checks for $surface and their parameters, from $wgUploadSafetySurfaces or else $wgUploadSafetyChecks.
+	 * Enabled checks for $surface and their parameters: $wgUploadSafetyChecks, with the surface's `checks` from $wgUploadSafetySurfaces added on top (a check listed in both takes the surface's parameters, and `false` turns a check off for the surface).
 	 * Accepts `[ 'nsfw' ]` as shorthand for `[ 'nsfw' => [] ]`.
 	 *
 	 * @return array<string, array<string, mixed>>
 	 */
 	public function enabled_checks( string $surface ): array {
-		$config = $this->surface_setting( $surface, 'checks' ) ?? $this->options->get( 'UploadSafetyChecks' );
+		$surface_checks = $this->surface_setting( $surface, 'checks' );
+		$entries = [
+			...self::check_entries( $this->options->get( 'UploadSafetyChecks' ) ),
+			...self::check_entries( $surface_checks ),
+		];
+
+		return array_filter( $entries, static fn ( $params ) => $params !== false );
+	}
+
+	/**
+	 * @return array<string, array<string, mixed>|false> Check name => parameters, or false when turned off
+	 */
+	private static function check_entries( mixed $config ): array {
 		if ( !is_array( $config ) ) {
 			return [];
 		}
 
-		$checks = [];
+		$entries = [];
 		foreach ( $config as $key => $value ) {
 			if ( is_int( $key ) && is_string( $value ) ) {
-				$checks[$value] = [];
-			} elseif ( is_string( $key ) && $value !== false && $value !== null ) {
-				$checks[$key] = is_array( $value ) ? $value : [];
+				$entries[$value] = [];
+			} elseif ( is_string( $key ) ) {
+				$entries[$key] = $value === false || $value === null ? false : ( is_array( $value ) ? $value : [] );
 			}
 		}
 
-		return $checks;
+		return $entries;
+	}
+
+	/**
+	 * Message for a rejection by $checks: their own when they all share one (RejectionMessage), the generic one otherwise.
+	 *
+	 * @param array<string, CheckResult> $checks
+	 */
+	private function rejection_message( array $checks ): string {
+		$keys = [];
+		foreach ( array_keys( $checks ) as $name ) {
+			$evaluator = $this->evaluators[$name] ?? null;
+			$keys[] = $evaluator instanceof RejectionMessage ? $evaluator->rejection_message() : self::MSG_REJECTED;
+		}
+
+		$keys = array_unique( $keys );
+
+		return count( $keys ) === 1 ? $keys[0] : self::MSG_REJECTED;
 	}
 
 	private function decide( string $file_path, string $mime, string $surface ): ScreeningResult {
@@ -183,15 +213,14 @@ class UploadScreener {
 		$frames = $response->frames_summary();
 		$detail = $frames !== '' ? 'frames=' . $frames : '';
 
-		foreach ( $results as $result ) {
-			if ( $result->verdict === CheckVerdict::Reject ) {
-				return new ScreeningResult( true, self::MSG_REJECTED, $results, $detail );
-			}
+		$rejecting = array_filter( $results, static fn ( CheckResult $result ) => $result->verdict === CheckVerdict::Reject );
+		if ( $rejecting !== [] ) {
+			return new ScreeningResult( true, $this->rejection_message( $rejecting ), $results, $detail );
 		}
 
-		$suspects = count( array_filter( $results, static fn ( CheckResult $result ) => $result->verdict === CheckVerdict::Suspect ) );
-		if ( $suspects >= $this->suspects_to_reject( $surface ) ) {
-			return new ScreeningResult( true, self::MSG_REJECTED, $results, trim( $detail . ' suspects=' . $suspects ) );
+		$suspects = array_filter( $results, static fn ( CheckResult $result ) => $result->verdict === CheckVerdict::Suspect );
+		if ( count( $suspects ) >= $this->suspects_to_reject( $surface ) ) {
+			return new ScreeningResult( true, $this->rejection_message( $suspects ), $results, trim( $detail . ' suspects=' . count( $suspects ) ) );
 		}
 
 		foreach ( $results as $result ) {

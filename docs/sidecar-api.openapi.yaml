@@ -172,7 +172,7 @@ components:
           properties:
             status:
               const: error
-      description: When status is ok, the remaining fields follow the check's signal schema (NsfwSignal, NudityRegionsSignal).
+      description: When status is ok, the remaining fields follow the check's signal schema (NsfwSignal, NudityRegionsSignal, FacesSignal).
     NsfwSignal:
       type: object
       required: [ status, score, frame ]
@@ -236,6 +236,45 @@ components:
                 items:
                   type: integer
                   minimum: 0
+    FacesSignal:
+      type: object
+      required: [ status, faces ]
+      properties:
+        status:
+          const: ok
+        min_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        model:
+          type: string
+        faces:
+          type: array
+          description: Faces over all analysed frames, highest score first.
+          items:
+            type: object
+            required: [ score, frame, box, area ]
+            properties:
+              score:
+                type: number
+                minimum: 0
+                maximum: 1
+              frame:
+                type: integer
+                minimum: 0
+              box:
+                type: array
+                description: '[x, y, width, height] in source pixels, clipped to the frame'
+                minItems: 4
+                maxItems: 4
+                items:
+                  type: integer
+                  minimum: 0
+              area:
+                type: number
+                minimum: 0
+                maximum: 1
+                description: Share of the frame the box covers.
     Info:
       type: object
       required: [ service, checks ]

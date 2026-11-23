@@ -7,6 +7,8 @@
 	"uploadsafety-desc": "Screens uploaded images and rejects content that fails moderation.",
 	"uploadsafety-upload-rejected": "This image was rejected by content moderation.",
 	"uploadsafety-upload-rejected-debug": "This image was rejected by content moderation. [$1]",
+	"uploadsafety-upload-rejected-face": "This image looks like a photo of a real person, which can't be used here. Drawings, game characters and other images are fine.",
+	"uploadsafety-upload-rejected-face-debug": "This image looks like a photo of a real person, which can't be used here. Drawings, game characters and other images are fine. [$1]",
 	"uploadsafety-upload-unavailable": "This image could not be checked by content moderation and was rejected.",
 	"uploadsafety-upload-unavailable-debug": "This image could not be checked by content moderation and was rejected. [$1]",
 	"uploadsafety-debug-approved": "Content moderation debug (approved): $1",

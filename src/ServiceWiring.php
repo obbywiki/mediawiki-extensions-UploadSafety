@@ -2,6 +2,7 @@
 
 use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Extension\UploadSafety\AutoScreening;
+use MediaWiki\Extension\UploadSafety\Check\FacesEvaluator;
 use MediaWiki\Extension\UploadSafety\Check\NsfwEvaluator;
 use MediaWiki\Extension\UploadSafety\Check\NudityRegionsEvaluator;
 use MediaWiki\Extension\UploadSafety\RejectionLog;
@@ -41,6 +42,7 @@ return [
 			[
 				new NsfwEvaluator(),
 				new NudityRegionsEvaluator(),
+				new FacesEvaluator(),
 			],
 			LoggerFactory::getInstance( 'UploadSafety' )
 		);

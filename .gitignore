@@ -12,6 +12,6 @@ composer.lock
 sidecar/models*.json
 
 # evals/results leak the model names
-sidecar/eval/corpus/
+sidecar/eval/corpus*/
 sidecar/eval/results/
 __pycache__/

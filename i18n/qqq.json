@@ -7,6 +7,8 @@
 	"uploadsafety-desc": "{{desc|name=UploadSafety|url=https://github.com/obbywiki/mediawiki-extensions-UploadSafety}}",
 	"uploadsafety-upload-rejected": "Error shown when an image upload is blocked by a moderation check.",
 	"uploadsafety-upload-rejected-debug": "Debug error shown when an image upload is blocked. $1 is screening detail (checks, labels, scores, threshold).",
+	"uploadsafety-upload-rejected-face": "Error shown when an avatar or banner is blocked because it contains a photo of a real person's face (to protect users' privacy).",
+	"uploadsafety-upload-rejected-face-debug": "Debug variant of {{msg-mw|uploadsafety-upload-rejected-face}}. $1 is screening detail (checks, scores, thresholds).",
 	"uploadsafety-upload-unavailable": "Error shown when a moderation check cannot be reached and the upload is rejected.",
 	"uploadsafety-upload-unavailable-debug": "Debug error shown when a moderation check fails. $1 is the failure reason.",
 	"uploadsafety-debug-approved": "Notice shown on the next page after a successful image upload when debug mode is enabled. $1 is screening detail (checks, labels, scores, threshold).",

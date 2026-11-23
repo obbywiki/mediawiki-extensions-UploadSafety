@@ -40,6 +40,9 @@ MAX_DECODE_FRAMES = int(os.environ.get("MAX_DECODE_FRAMES", "1000"))
 MAX_TILES = int(os.environ.get("MAX_TILES", "4"))
 # detector regions below this score are not reported (part of the nudity_regions signal as min_score)
 MIN_REGION_SCORE = float(os.environ.get("MIN_REGION_SCORE", "0.2"))
+# faces below this score are not reported (min_score in the faces signal); at most MAX_FACES are, strongest first
+MIN_FACE_SCORE = float(os.environ.get("MIN_FACE_SCORE", "0.5"))
+MAX_FACES = int(os.environ.get("MAX_FACES", "10"))
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "8"))  # peak memory grows with it
 THREADS = int(os.environ.get("THREADS", "0"))  # 0 lets ONNX Runtime pick
 # ONNX Runtime's memory arena keeps the peak of the largest batch forever. without it, memory goes back down between requests
@@ -199,10 +202,106 @@ class Detector:
         return {"status": "ok", "min_score": MIN_REGION_SCORE, "regions": regions, "model": self.model}
 
 
-KINDS = {"classifier": Classifier, "detector": Detector}
+def non_maximum_suppression(boxes: np.ndarray, scores: np.ndarray, overlap: float) -> list[int]:
+    """Indices of the boxes ([x, y, width, height]) to keep, strongest first, dropping any that overlaps a stronger one by more than `overlap` IoU."""
+    order = list(np.argsort(-scores))
+    keep: list[int] = []
+    while order:
+        best = order.pop(0)
+        keep.append(best)
+        if not order:
+            break
+        rest = np.array(order)
+        left = np.maximum(boxes[best, 0], boxes[rest, 0])
+        top = np.maximum(boxes[best, 1], boxes[rest, 1])
+        right = np.minimum(boxes[best, 0] + boxes[best, 2], boxes[rest, 0] + boxes[rest, 2])
+        bottom = np.minimum(boxes[best, 1] + boxes[best, 3], boxes[rest, 1] + boxes[rest, 3])
+        intersection = np.clip(right - left, 0, None) * np.clip(bottom - top, 0, None)
+        union = boxes[best, 2] * boxes[best, 3] + boxes[rest, 2] * boxes[rest, 3] - intersection
+        order = [index for index, iou in zip(order, intersection / np.maximum(union, 1e-9)) if iou <= overlap]
+    return keep
 
 
-def load_checks() -> dict[str, Classifier | Detector]:
+YUNET_STRIDES = (8, 16, 32)
+YUNET_OUTPUTS = [f"{kind}_{stride}" for kind in ("cls", "obj", "bbox") for stride in YUNET_STRIDES]
+
+
+class FaceDetector:
+    """OpenCV YuNet face detector from the manifest: reports the strongest faces over all frames.
+
+    Pre- and post-processing follow OpenCV's FaceDetectorYN (objdetect/src/face_detect.cpp): BGR pixels 0-255 padded at the bottom right,
+    then for each stride a grid of cells with score sqrt(cls * obj) and a box relative to the cell.
+    """
+
+    def __init__(self, name: str, entry: dict[str, Any]) -> None:
+        self.name = name
+        self.model = entry["model"]
+        self.revision = entry.get("revision", "")
+        self.size: int = entry["size"]
+        self.input: str = entry["input"]
+        self.session = open_session(entry)
+        # (column, row) of every cell, per stride
+        self.grids = {}
+        for stride in YUNET_STRIDES:
+            cells = self.size // stride
+            self.grids[stride] = (np.tile(np.arange(cells), cells), np.repeat(np.arange(cells), cells))
+
+    def faces(self, frame: Image.Image) -> list[tuple[float, list[float]]]:
+        """(score, [x, y, width, height] in frame pixels) of every face in one frame, strongest first."""
+        scale = self.size / max(frame.width, frame.height)
+        resized = frame.resize((max(1, round(frame.width * scale)), max(1, round(frame.height * scale))), Image.Resampling.BILINEAR)
+        canvas = Image.new("RGB", (self.size, self.size), (0, 0, 0))
+        canvas.paste(resized, (0, 0))
+        pixels = np.ascontiguousarray(np.asarray(canvas, dtype=np.float32)[:, :, ::-1].transpose(2, 0, 1)[None])  # BGR
+
+        outputs = dict(zip(YUNET_OUTPUTS, self.session.run(YUNET_OUTPUTS, {self.input: pixels})))
+        all_scores, all_boxes = [], []
+        for stride in YUNET_STRIDES:
+            scores = np.sqrt(np.clip(outputs[f"cls_{stride}"][0, :, 0], 0, 1) * np.clip(outputs[f"obj_{stride}"][0, :, 0], 0, 1))
+            keep = scores >= MIN_FACE_SCORE
+            if not keep.any():
+                continue
+            columns, rows = self.grids[stride]
+            bbox = outputs[f"bbox_{stride}"][0][keep]
+            centre_x = (columns[keep] + bbox[:, 0]) * stride
+            centre_y = (rows[keep] + bbox[:, 1]) * stride
+            width = np.exp(np.clip(bbox[:, 2], -10, 10)) * stride
+            height = np.exp(np.clip(bbox[:, 3], -10, 10)) * stride
+            all_scores.append(scores[keep])
+            all_boxes.append(np.stack([centre_x - width / 2, centre_y - height / 2, width, height], axis=1) / scale)
+
+        if not all_scores:
+            return []
+        scores, boxes = np.concatenate(all_scores), np.concatenate(all_boxes)
+        faces = []
+        for index in non_maximum_suppression(boxes, scores, 0.3):
+            x, y, width, height = boxes[index].tolist()
+            left, top = max(0.0, x), max(0.0, y)
+            right, bottom = min(float(frame.width), x + width), min(float(frame.height), y + height)
+            if right > left and bottom > top:
+                faces.append((float(scores[index]), [left, top, right - left, bottom - top]))
+        return faces
+
+    def __call__(self, frames: list[Image.Image], indices: list[int]) -> dict[str, Any]:
+        found = []
+        for frame, index in zip(frames, indices):
+            for score, (x, y, width, height) in self.faces(frame):
+                found.append({
+                    "score": score,
+                    "frame": index,
+                    "box": [round(x), round(y), round(width), round(height)],
+                    # share of the frame the face covers: a selfie fills it, a face in a crowd does not
+                    "area": min(1.0, (width * height) / (frame.width * frame.height)),
+                })
+
+        found.sort(key=lambda face: face["score"], reverse=True)
+        return {"status": "ok", "min_score": MIN_FACE_SCORE, "faces": found[:MAX_FACES], "model": self.model}
+
+
+KINDS = {"classifier": Classifier, "detector": Detector, "faces": FaceDetector}
+
+
+def load_checks() -> dict[str, Classifier | Detector | FaceDetector]:
     onnxruntime.disable_telemetry_events()
     manifest = json.loads((MODELS_DIR / "manifest.json").read_text())
     checks = {}

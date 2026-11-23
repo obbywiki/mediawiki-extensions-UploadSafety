@@ -6,6 +6,7 @@ namespace MediaWiki\Extension\UploadSafety\Tests\Unit;
 use MediaWiki\Config\HashConfig;
 use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Extension\UploadSafety\Check\CheckVerdict;
+use MediaWiki\Extension\UploadSafety\Check\FacesEvaluator;
 use MediaWiki\Extension\UploadSafety\Check\NsfwEvaluator;
 use MediaWiki\Extension\UploadSafety\Check\NudityRegionsEvaluator;
 use MediaWiki\Extension\UploadSafety\Sidecar\SidecarClient;
@@ -67,7 +68,7 @@ class UploadScreenerTest extends MediaWikiUnitTestCase {
 			'UploadSafetySurfaces' => [],
 		] ) );
 
-		return new UploadScreener( $options, $sidecar, [ new NsfwEvaluator(), new NudityRegionsEvaluator() ], new NullLogger() );
+		return new UploadScreener( $options, $sidecar, [ new NsfwEvaluator(), new NudityRegionsEvaluator(), new FacesEvaluator() ], new NullLogger() );
 	}
 
 	/**
@@ -263,7 +264,7 @@ class UploadScreenerTest extends MediaWikiUnitTestCase {
 			'UploadSafetyMaxFrames' => 64,
 			'UploadSafetySuspectsToReject' => 2,
 			'UploadSafetySurfaces' => [
-				'avatar' => [ 'checks' => [ 'nudity_regions' => [ 'thresholds' => [ 'breast_exposed' => 0.3 ], 'suspect' => 0.2 ] ], 'suspects_to_reject' => 1 ],
+				'avatar' => [ 'checks' => [ 'nsfw' => false ], 'suspects_to_reject' => 1 ],
 			],
 		] ) );
 
@@ -271,7 +272,36 @@ class UploadScreenerTest extends MediaWikiUnitTestCase {
 			->screen( $this->png_path, 'image/png', 'Avatar.png', 'avatar' );
 
 		$this->assertTrue( $result->rejected, 'one doubtful check is enough on avatars' );
-		$this->assertSame( [ 'nudity_regions' ], array_keys( $result->checks ) );
+		$this->assertSame( [ 'nudity_regions' ], array_keys( $result->checks ), 'nsfw turned off for avatars' );
+	}
+
+	public function test_surface_checks_are_added_to_the_global_ones(): void {
+		$screener = $this->new_screener(
+			self::response( [ 'nsfw' => self::nsfw( 0.1 ), 'nudity_regions' => self::regions(), 'faces' => [ 'status' => 'ok', 'faces' => [ [ 'score' => 0.93, 'area' => 0.3 ] ] ] ] ),
+			[
+				'UploadSafetyChecks' => self::BOTH_CHECKS,
+				'UploadSafetySurfaces' => [ 'avatar' => [ 'checks' => [ 'faces' => [], 'nsfw' => [ 'threshold' => 0.9 ] ] ] ],
+			]
+		);
+
+		$this->assertSame( [ 'nsfw', 'nudity_regions', 'faces' ], array_keys( $screener->enabled_checks( 'avatar' ) ) );
+		$this->assertSame( [ 'threshold' => 0.9 ], $screener->enabled_checks( 'avatar' )['nsfw'], 'the surface parameters win' );
+		$this->assertSame( self::BOTH_CHECKS, $screener->enabled_checks( 'upload' ) );
+
+		$result = $screener->screen( $this->png_path, 'image/png', '', 'avatar' );
+		$this->assertTrue( $result->rejected );
+		$this->assertSame( 'uploadsafety-upload-rejected-face', $result->message_key, 'a face rejection explains itself' );
+		$this->assertSame( [ 'uploadsafety-upload-rejected-face' ], $screener->rejection_error( $result ) );
+	}
+
+	public function test_rejection_by_different_checks_uses_the_generic_message(): void {
+		$result = $this->new_screener(
+			self::response( [ 'nsfw' => self::nsfw( 0.99 ), 'nudity_regions' => self::regions(), 'faces' => [ 'status' => 'ok', 'faces' => [ [ 'score' => 0.93, 'area' => 0.3 ] ] ] ] ),
+			[ 'UploadSafetyChecks' => self::BOTH_CHECKS + [ 'faces' => [] ] ]
+		)->screen( $this->png_path, 'image/png' );
+
+		$this->assertTrue( $result->rejected );
+		$this->assertSame( UploadScreener::MSG_REJECTED, $result->message_key );
 	}
 
 	public function test_surface_can_override_only_suspects_to_reject(): void {

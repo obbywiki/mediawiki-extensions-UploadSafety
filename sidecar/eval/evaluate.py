@@ -127,13 +127,17 @@ def run(args: argparse.Namespace) -> int:
 
 
 def summarize(result: dict[str, Any]) -> dict[str, Any]:
-    """One score per check. For region checks, that is the strongest `*_exposed` region (0 when there is none)."""
+    """One score per check. For region checks, that is the strongest `*_exposed` region, for faces the strongest face (0 when there is none)."""
     summary = {key: result.get(key) for key in ("status", "score", "frame", "error")}
     if result.get("status") == "ok" and isinstance(result.get("regions"), list):
         exposed = [region for region in result["regions"] if str(region.get("label", "")).endswith("_exposed")]
         top = max(exposed, key=lambda region: region["score"], default=None)
         summary.update(score=top["score"] if top else 0.0, frame=top["frame"] if top else None, label=top["label"] if top else None)
         summary["regions"] = result["regions"]
+    if result.get("status") == "ok" and isinstance(result.get("faces"), list):
+        top = max(result["faces"], key=lambda face: face["score"], default=None)
+        summary.update(score=top["score"] if top else 0.0, frame=top["frame"] if top else None, area=top["area"] if top else None)
+        summary["faces"] = result["faces"]
     return summary
 
 

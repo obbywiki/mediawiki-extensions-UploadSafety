@@ -146,8 +146,28 @@
 			"description": "Checks to run, as name => parameters. Setting this replaces the default entirely. nsfw: reject when the score is >= threshold. nudity_regions: reject when a region's score is >= the threshold for its label (labels left out of thresholds are ignored). With suspect, scores from there up to the threshold are doubtful, see UploadSafetySuspectsToReject."
 		},
 		"UploadSafetySurfaces": {
-			"value": {},
-			"description": "Per-surface overrides (upload, avatar, banner, ...), as surface => [ 'checks' => ..., 'suspects_to_reject' => ... ]. Each key replaces UploadSafetyChecks or UploadSafetySuspectsToReject for that surface, and keys that are left out use the global setting."
+			"value": {
+				"avatar": {
+					"checks": {
+						"faces": {
+							"threshold": 0.7,
+							"suspect": 0.6,
+							"min_area": 0.05
+						}
+					}
+				},
+				"banner": {
+					"checks": {
+						"faces": {
+							"threshold": 0.7,
+							"suspect": 0.6,
+							"min_area": 0.05
+						}
+					}
+				}
+			},
+			"merge_strategy": "provide_default",
+			"description": "Per-surface settings (upload, avatar, banner, ...), as surface => [ 'checks' => ..., 'suspects_to_reject' => ... ]. A surface's checks are added to UploadSafetyChecks (false turns one off for that surface), and suspects_to_reject replaces UploadSafetySuspectsToReject. Setting this replaces the default (faces on avatars and banners) entirely."
 		},
 		"UploadSafetySuspectsToReject": {
 			"value": 2,
